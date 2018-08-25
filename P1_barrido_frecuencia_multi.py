@@ -28,6 +28,7 @@ chunk_acq = int(fs*duration_sec_acq)
 chunk_send = int(fs*duration_sec_send)
 
 p = pyaudio.PyAudio()
+
    
 # Defino el stream del microfono
 stream_input = p.open(format = pyaudio.paInt16,
@@ -46,6 +47,7 @@ stream_output = p.open(format=pyaudio.paFloat32,
                 
 )
 
+
 # Defino los semaforos para sincronizar la señal y la adquisicion
 semaphore1 = threading.Semaphore() # Este semaforo es para asegurar que la adquisicion este siempre dentro de la señal enviada
 semaphore2 = threading.Semaphore() # Este semaforo es para asegurar que no se envie una nueva señal antes de haber adquirido y guardado la anterior
@@ -56,7 +58,8 @@ data_send = np.zeros([steps,chunk_send],dtype=np.float32)  # aqui guardo la señ
 frecs_send = np.zeros(steps)   # aqui guardo las frecuencias
 
 tic = datetime.datetime.now()
-def producer(steps, delta_frec):    
+def producer(steps, delta_frec):  
+    global producer_exit
     for i in range(steps):
         f = frec_ini_hz + delta_frec_hz*i
         samples = (A*np.sin(2*np.pi*np.arange(np.dtype(np.float32).itemsize*chunk_send)*f/fs)).astype(np.float32)   
@@ -74,15 +77,16 @@ def producer(steps, delta_frec):
         stream_output.stop_stream()
 
 
-        
+    producer_exit = True  
         
         
         
 # Defino el thread que adquiere la señal        
 data_acq = np.zeros([steps,chunk_acq],dtype=np.int16)  # aqui guardo la señal adquirida
 def consumer():
+    global consumer_exit
     count = 0
-    while(1):
+    while(count<steps):
         semaphore1.acquire() # Se da por avisado que que el productor comenzó un nuevo step
         
         # Adquiere la señal y la guarda en el array
@@ -96,8 +100,12 @@ def consumer():
         print ('Termina Consumidor: '+ str(count))
         count = count + 1
         semaphore2.release() # Avisa al productor que terminó de escribir los datos y puede comenzar con el próximo step
-        
-    
+
+    consumer_exit = True  
+       
+
+producer_exit = False   
+consumer_exit = False 
         
 # Inicio los threads    
 t1 = threading.Thread(target=producer, args=[steps,delta_frec_hz])
@@ -105,7 +113,7 @@ t2 = threading.Thread(target=consumer, args=[])
 t1.start()
 t2.start()
 
-while(stream_input.is_active() or stream_output.is_active()):
+while(not producer_exit or not consumer_exit):
     time.sleep(np.max([duration_sec_acq,duration_sec_send]))
     
 stream_input.close()

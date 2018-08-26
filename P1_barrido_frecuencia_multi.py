@@ -13,7 +13,7 @@ El script lanza dos thread o hilos que se ejecutan contemporaneamente:
 uno para la generación de la señal (producer) y otro para la adquisicón (consumer).
 El proceso está programado para que el hilo productor envie una señal y habilite en ese momento la adquisición del hilo consumidor.
 Se utilizan dos semaforos para la interección entre threads: 
-    - semaphore1 indica el comienzo de casa paso en el barrido de frecuencia y avisa al consumidor que puede comenzar la adquisición
+    - semaphore1 indica el comienzo de cada paso en el barrido de frecuencia y avisa al consumidor que puede comenzar la adquisición
     - semaphore2 indica que el hilo consumidor ya ha adquirido la señal y por lo tanto se puede comenzar la adquisición de siguiente paso
 La señal enviada se guarda en el array data_send, donde cada fila indica un paso del barrido 
 La señal adquirida se guarda en el array data_acq, donde cada fila indica un paso del barrido 
@@ -163,6 +163,8 @@ p.terminate()
 # Elijo la frecuencia
 ind_frec = 10
 
+
+### Muestra la serie temporal de las señales enviadas y adquiridas
 t_send = np.linspace(0,np.size(data_send,1)-1,np.size(data_send,1))/fs
 t_adq = np.linspace(0,np.size(data_acq,1)-1,np.size(data_acq,1))/fs
 
@@ -177,7 +179,7 @@ ax.legend(loc=1)
 ax1.legend(loc=4)
 plt.show()
 
-
+### Realiza la FFT de la señal enviada y adquirida
 fft_send = abs(fft.fft(data_send[ind_frec,:]))
 fft_send = fft_send[0:int(chunk_send/2+1)]
 fft_acq = abs(fft.fft(data_acq[ind_frec,:]))

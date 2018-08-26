@@ -20,9 +20,12 @@ La señal adquirida se guarda en el array data_acq, donde cada fila indica un pa
 
 Algunas dudas:
     - el buffer donde se lee la adquisición guarda datos de la adquisicón correspondiente al paso anterior. Para evitar esto se borran 
-    los primeros datos del buffer, pero no es muy profesional. Esto se observa cuando los el tiempo de adquisicíon es menor al tiempo
+    los primeros datos del buffer, pero no es muy profesional. Esto se observa cuando el tiempo de adquisicíon es menor al tiempo
     de la señal enviada. En cualquier caso saca los primeros datos del buffer.
-    - la señal digital que se envia debe ser cuatro veces mas larga que la que definitivamente se envia analogicamente.
+    - la señal digital que se envia debe ser cuatro veces mas larga que la que definitivamente se envia analógicamente. No entiendo porqué.
+
+Falta:
+    - mejorar la interrupción del script por el usuario. Por el momento termina únicamente cuando termina la corrida.
 
 Al final de script se agregan dos secciones para verificar el correcto funcionamiento del script y para medir el retardo
 entre mediciones iguales.
@@ -49,6 +52,7 @@ import numpy.fft as fft
 import datetime
 import time
 import matplotlib.pylab as pylab
+from scipy import signal
 
 params = {'legend.fontsize': 'medium',
      #     'figure.figsize': (15, 5),
@@ -61,10 +65,10 @@ pylab.rcParams.update(params)
 
 fs = 44100 # frecuencia de sampleo en Hz
 frec_ini_hz = 840 # frecuencia inicial de barrido en Hz
-steps = 20 # cantidad de pasos del barrido
-delta_frec_hz = 0 # paso del barrido en Hz
+steps = 10 # cantidad de pasos del barrido
+delta_frec_hz = -40 # paso del barrido en Hz
 duration_sec_send = 0.5 # duracion de la señal de salida de cada paso en segundos
-duration_sec_acq = 0.1 # duracion de la adquisicón de cada paso en segundos
+duration_sec_acq = 0.70# duracion de la adquisicón de cada paso en segundos
 A = 0.1 # Amplitud de la señal de salida
 
 chunk_acq = int(fs*duration_sec_acq)
@@ -108,15 +112,20 @@ def producer(steps, delta_frec):
     i = 0
     while(i<steps):
         f = frec_ini_hz + delta_frec_hz*i
-        samples = (A*np.sin(2*np.pi*np.arange(np.dtype(np.float32).itemsize*chunk_send)*f/fs)).astype(np.float32)   
-        data_send[i][:] = samples[0:int(len(samples)/np.dtype(np.float32).itemsize)]
+        
+        samples = (A*np.sin(2*np.pi*np.arange(1*chunk_send)*f/fs)).astype(np.float32) 
+        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
+        #samples = np.append(samples, (A/2*np.sin(2*np.pi*np.arange(1*int(fs*0.1))*f/fs)).astype(np.float32))
+        #samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
+        #samples = A*signal.square(2*np.pi*np.arange(np.dtype(np.float32).itemsize*chunk_send)*f/fs).astype(np.float32)  
+        data_send[i][:] = samples[0:chunk_send]
         frecs_send[i] = f
-        i = i + 1
         semaphore2.acquire() # Se da por avisado que terminó el step anterior
         semaphore1.release() # Avisa al consumidor que comienza la adquisicion
 
         print ('Frecuencia: ' + str(f) + ' Hz')
         print ('Empieza Productor: '+ str(i))
+        i = i + 1
         
         # Envia la señal y la guarda en el array
         stream_output.start_stream()
@@ -160,7 +169,7 @@ t2 = threading.Thread(target=consumer, args=[])
 t1.start()
 t2.start()
 
-        
+     
 while(not producer_exit or not consumer_exit):
     time.sleep(np.max([duration_sec_acq,duration_sec_send]))
 

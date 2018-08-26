@@ -13,8 +13,8 @@ El script lanza dos thread o hilos que se ejecutan contemporaneamente:
 uno para la generación de la señal (producer) y otro para la adquisicón (consumer).
 El script está programado para que el hilo productor envie una señal y habilite en ese momento la adquisición del hilo consumidor.
 Se utilizan dos semaforos para la interección entre threads: 
-    - semaphore1 indica el comienzo de cada paso en el barrido de frecuencia y avisa al consumidor que puede comenzar la adquisición
-    - semaphore2 indica que el hilo consumidor ya ha adquirido la señal y por lo tanto se puede comenzar la adquisición del siguiente paso
+    - semaphore1: señala el comienzo de cada paso del barrido de frecuencias, y avisa al consumidor que puede comenzar la adquisición.
+    - semaphore2: señala que el hilo consumidor ya ha adquirido la señal y por lo tanto se puede comenzar la adquisición del siguiente paso del barrido.
 La señal enviada se guarda en el array data_send, donde cada fila indica un paso del barrido 
 La señal adquirida se guarda en el array data_acq, donde cada fila indica un paso del barrido 
 
@@ -25,7 +25,7 @@ Algunas dudas:
     - La señal digital que se envia debe ser cuatro veces mas larga que la que se envía analógicamente. No entiendo porqué.
 
 Falta:
-    - mejorar la interrupción del script por el usuario. Por el momento termina únicamente cuando termina la corrida.
+    - Mejorar la interrupción del script por el usuario. Por el momento termina únicamente cuando termina la corrida.
 
 Al final del script se agregan dos secciones para verificar el correcto funcionamiento del script y para medir el retardo
 entre mediciones iguales. En mi pc de escritorio el retardo entre señales medidas es de +/- 3 ms.
@@ -120,17 +120,18 @@ def producer(steps, delta_frec):
         #samples = A*signal.square(2*np.pi*np.arange(np.dtype(np.float32).itemsize*chunk_send)*f/fs).astype(np.float32)  
         data_send[i][:] = samples[0:chunk_send]
         frecs_send[i] = f
-        semaphore2.acquire() # Se da por avisado que terminó el step anterior
-        semaphore1.release() # Avisa al consumidor que comienza la adquisicion
-
+        
         print ('Frecuencia: ' + str(f) + ' Hz')
         print ('Empieza Productor: '+ str(i))
-        i = i + 1
+        i = i + 1       
+        
+        semaphore2.acquire() # Se da por avisado que terminó el step anterior
+        semaphore1.release() # Avisa al consumidor que comienza la adquisicion
         
         # Envia la señal y la guarda en el array
         stream_output.start_stream()
         stream_output.write(samples)
-        stream_output.stop_stream()
+        stream_output.stop_stream()        
 
     producer_exit = True  
         

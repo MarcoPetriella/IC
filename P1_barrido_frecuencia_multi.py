@@ -48,13 +48,23 @@ import threading
 import numpy.fft as fft
 import datetime
 import time
+import matplotlib.pylab as pylab
+import sys
+
+params = {'legend.fontsize': 'medium',
+     #     'figure.figsize': (15, 5),
+         'axes.labelsize': 'medium',
+         'axes.titlesize':'medium',
+         'xtick.labelsize':'medium',
+         'ytick.labelsize':'medium'}
+pylab.rcParams.update(params)
 
 
 fs = 44100 # frecuencia de sampleo en Hz
-frec_ini_hz = 440 # frecuencia inicial de barrido en Hz
-steps = 50 # cantidad de pasos del barrido
+frec_ini_hz = 840 # frecuencia inicial de barrido en Hz
+steps = 20 # cantidad de pasos del barrido
 delta_frec_hz = 0 # paso del barrido en Hz
-duration_sec_send = 1 # duracion de la señal de salida de cada paso en segundos
+duration_sec_send = 0.5 # duracion de la señal de salida de cada paso en segundos
 duration_sec_acq = 0.1 # duracion de la adquisicón de cada paso en segundos
 A = 0.1 # Amplitud de la señal de salida
 
@@ -81,6 +91,8 @@ stream_output = p.open(format=pyaudio.paFloat32,
                 
 )
 
+#print (stream_output.get_output_latency()*1000)
+
 
 # Defino los semaforos para sincronizar la señal y la adquisicion
 semaphore1 = threading.Semaphore() # Este semaforo es para asegurar que la adquisicion este siempre dentro de la señal enviada
@@ -94,11 +106,13 @@ frecs_send = np.zeros(steps)   # aqui guardo las frecuencias
 tic = datetime.datetime.now()
 def producer(steps, delta_frec):  
     global producer_exit
-    for i in range(steps):
+    i = 0
+    while(i<steps):
         f = frec_ini_hz + delta_frec_hz*i
         samples = (A*np.sin(2*np.pi*np.arange(np.dtype(np.float32).itemsize*chunk_send)*f/fs)).astype(np.float32)   
         data_send[i][:] = samples[0:int(len(samples)/np.dtype(np.float32).itemsize)]
         frecs_send[i] = f
+        i = i + 1
         semaphore2.acquire() # Se da por avisado que terminó el step anterior
         semaphore1.release() # Avisa al consumidor que comienza la adquisicion
 
@@ -118,21 +132,21 @@ def producer(steps, delta_frec):
 data_acq = np.zeros([steps,chunk_acq],dtype=np.int16)  # aqui guardo la señal adquirida
 def consumer():
     global consumer_exit
-    count = 0
-    while(count<steps):
+    j = 0
+    while(j<steps):
         semaphore1.acquire() # Se da por avisado que que el productor comenzó un nuevo step
         
         # Adquiere la señal y la guarda en el array
         stream_input.start_stream()
         data_i = stream_input.read(int(fs*stream_output.get_output_latency())) # esto lo pongo porque el buffer parece quedar lleno de la medicion anterior
-        data_i = stream_input.read(chunk_acq)   
+        data_i = stream_input.read(chunk_acq)  
         stream_input.stop_stream()      
         
-        data_acq[count][:] = np.frombuffer(data_i, dtype=np.int16)
+        data_acq[j][:] = np.frombuffer(data_i, dtype=np.int16)
         
-        print ('Termina Consumidor: '+ str(count))
+        print ('Termina Consumidor: '+ str(j))
         print ('')
-        count = count + 1
+        j = j + 1
         semaphore2.release() # Avisa al productor que terminó de escribir los datos y puede comenzar con el próximo step
 
     consumer_exit = True  
@@ -147,8 +161,11 @@ t2 = threading.Thread(target=consumer, args=[])
 t1.start()
 t2.start()
 
+        
 while(not producer_exit or not consumer_exit):
     time.sleep(np.max([duration_sec_acq,duration_sec_send]))
+
+
     
 stream_input.close()
 stream_output.close()
@@ -161,7 +178,7 @@ p.terminate()
 ### ANALISIS de la señal adquirida
 
 # Elijo la frecuencia
-ind_frec = 10
+ind_frec = 1
 
 
 ### Muestra la serie temporal de las señales enviadas y adquiridas
@@ -218,8 +235,8 @@ for i in range(steps):
     
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.15, .15, .8, .8])
-ax.hist(retardos,bins=10, rwidth =0.99)    
-ax.set_xlabel(u'Retardo [seg]')
+ax.hist(1000*retardos,bins=10, rwidth =0.99)    
+ax.set_xlabel(u'Retardo [ms]')
 ax.set_ylabel('Frecuencia [eventos]')
 ax.set_title(u'Histograma de retardo respecto a la primera medición')
 ax1.legend(loc=4)

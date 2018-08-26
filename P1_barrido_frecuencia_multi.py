@@ -20,8 +20,8 @@ La señal adquirida se guarda en el array data_acq, donde cada fila indica un pa
 
 Algunas dudas:
     - el buffer donde se lee la adquisición guarda datos de la adquisicón correspondiente al paso anterior. Para evitar esto se borran 
-    los primeros datos del buffer, pero no es muy profesional. Esto se observa cuando el tiempo de adquisicíon es menor al tiempo
-    de la señal enviada. En cualquier caso saca los primeros datos del buffer.
+    los primeros datos del buffer, pero no es muy profesional. La cantidad de datos agregados parece ser independiente del tiempo de adquisición
+    o la duración de la señal enviada.
     - la señal digital que se envia debe ser cuatro veces mas larga que la que definitivamente se envia analógicamente. No entiendo porqué.
 
 Falta:

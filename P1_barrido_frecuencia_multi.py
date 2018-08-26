@@ -49,7 +49,6 @@ import numpy.fft as fft
 import datetime
 import time
 import matplotlib.pylab as pylab
-import sys
 
 params = {'legend.fontsize': 'medium',
      #     'figure.figsize': (15, 5),

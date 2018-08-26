@@ -5,8 +5,42 @@ Created on Fri Aug 24 12:36:24 2018
 @author: Marco
 """
 
-#%% Seccion1
 
+"""
+Este script realiza un barrido en frecuencias utilizando la salida y entrada de audio como emisor-receptor.
+Utiliza la libreria pyaudio para generar las señales de salida y la entrada de adquisición.
+El script lanza dos thread o hilos que se ejecutan contemporaneamente: 
+uno para la generación de la señal (producer) y otro para la adquisicón (consumer).
+El proceso está programado para que el hilo productor envie una señal y habilite en ese momento la adquisición del hilo consumidor.
+Se utilizan dos semaforos para la interección entre threads: 
+    - semaphore1 indica el comienzo de casa paso en el barrido de frecuencia y avisa al consumidor que puede comenzar la adquisición
+    - semaphore2 indica que el hilo consumidor ya ha adquirido la señal y por lo tanto se puede comenzar la adquisición de siguiente paso
+La señal enviada se guarda en el array data_send, donde cada fila indica un paso del barrido 
+La señal adquirida se guarda en el array data_acq, donde cada fila indica un paso del barrido 
+
+Algunas dudas:
+    - el buffer donde se lee la adquisición guarda datos de la adquisicón correspondiente al paso anterior. Para evitar esto se borran 
+    los primeros datos del buffer, pero no es muy profesional. Esto se observa cuando los el tiempo de adquisicíon es menor al tiempo
+    de la señal enviada. En cualquier caso saca los primeros datos del buffer.
+    - la señal digital que se envia debe ser cuatro veces mas larga que la que definitivamente se envia analogicamente.
+
+Al final de script se agregan dos secciones para verificar el correcto funcionamiento del script y para medir el retardo
+entre mediciones iguales.
+
+
+Parametros
+----------
+fs = 44100 # frecuencia de sampleo en Hz
+frec_ini_hz = 440 # frecuencia inicial de barrido en Hz
+steps = 10 # cantidad de pasos del barrido
+delta_frec_hz = 50 # paso del barrido en Hz
+duration_sec_send = 2 # duracion de la señal de salida de cada paso en segundos
+duration_sec_acq = 0.2 # duracion de la adquisicón de cada paso en segundos
+A = 0.1 # Amplitud de la señal de salida
+
+"""
+
+#%%
 import pyaudio
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,11 +52,11 @@ import time
 
 fs = 44100 # frecuencia de sampleo en Hz
 frec_ini_hz = 440 # frecuencia inicial de barrido en Hz
-steps = 10 # cantidad de pasos del barrido
-duration_sec_send = 2 # duracion de cada paso en segundos
-duration_sec_acq = 2.2
-delta_frec_hz = 50 # paso del barrido en Hz
-A = 0.1
+steps = 50 # cantidad de pasos del barrido
+delta_frec_hz = 0 # paso del barrido en Hz
+duration_sec_send = 1 # duracion de la señal de salida de cada paso en segundos
+duration_sec_acq = 0.1 # duracion de la adquisicón de cada paso en segundos
+A = 0.1 # Amplitud de la señal de salida
 
 chunk_acq = int(fs*duration_sec_acq)
 chunk_send = int(fs*duration_sec_send)
@@ -51,7 +85,7 @@ stream_output = p.open(format=pyaudio.paFloat32,
 # Defino los semaforos para sincronizar la señal y la adquisicion
 semaphore1 = threading.Semaphore() # Este semaforo es para asegurar que la adquisicion este siempre dentro de la señal enviada
 semaphore2 = threading.Semaphore() # Este semaforo es para asegurar que no se envie una nueva señal antes de haber adquirido y guardado la anterior
-semaphore1.acquire() # Inicializa el semaforo
+semaphore1.acquire() # Inicializa el semaforo, lo pone en cero.
 
 # Defino el thread que envia la señal
 data_send = np.zeros([steps,chunk_send],dtype=np.float32)  # aqui guardo la señal enviada
@@ -76,7 +110,6 @@ def producer(steps, delta_frec):
         stream_output.write(samples)
         stream_output.stop_stream()
 
-
     producer_exit = True  
         
         
@@ -98,6 +131,7 @@ def consumer():
         data_acq[count][:] = np.frombuffer(data_i, dtype=np.int16)
         
         print ('Termina Consumidor: '+ str(count))
+        print ('')
         count = count + 1
         semaphore2.release() # Avisa al productor que terminó de escribir los datos y puede comenzar con el próximo step
 
@@ -127,11 +161,10 @@ p.terminate()
 ### ANALISIS de la señal adquirida
 
 # Elijo la frecuencia
-ind_frec = 6
+ind_frec = 10
 
 t_send = np.linspace(0,np.size(data_send,1)-1,np.size(data_send,1))/fs
 t_adq = np.linspace(0,np.size(data_acq,1)-1,np.size(data_acq,1))/fs
-
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.15, .15, .8, .8])
@@ -160,9 +193,42 @@ ax = fig.add_axes([.1, .1, .8, .8])
 ax1 = ax.twinx()
 ax.plot(frec_send,fft_send, label='Frec enviada: ' + str(frecs_send[ind_frec]) + ' Hz')
 ax1.plot(frec_acq,fft_acq,color='red', label=u'Señal adquirida')
+ax.set_title(u'FFT de la señal enviada y adquirida')
 ax.set_xlabel('Frecuencia [Hz]')
 ax.set_ylabel('Amplitud [a.u.]')
 ax.legend(loc=1)
 ax1.legend(loc=4)
 plt.show()
 
+#%%
+
+## Estudo del retardo en caso que delta_frec = 0
+
+retardos = np.array([])
+for i in range(steps):
+    
+    data_acq_i = data_acq[i,:]     
+    corr = np.correlate(data_acq[0,:] - np.mean(data_acq[0,:]),data_acq_i - np.mean(data_acq_i),mode='full')
+    pos_max = np.argmax(corr) - len(data_acq_i)
+    retardos = np.append(retardos,pos_max/fs)
+
+
+    
+fig = plt.figure(figsize=(14, 7), dpi=250)
+ax = fig.add_axes([.15, .15, .8, .8])
+ax.hist(retardos,bins=10, rwidth =0.99)    
+ax.set_xlabel(u'Retardo [seg]')
+ax.set_ylabel('Frecuencia [eventos]')
+ax.set_title(u'Histograma de retardo respecto a la primera medición')
+ax1.legend(loc=4)
+plt.show()    
+
+
+fig = plt.figure(figsize=(14, 7), dpi=250)
+ax = fig.add_axes([.15, .15, .8, .8])
+ax.hist(retardos*frec_ini_hz,bins=10, rwidth =0.99)    
+ax.set_xlabel(u'Retardo relativo [periodo]')
+ax.set_ylabel('Frecuencia [eventos]')
+ax.set_title(u'Histograma de retardo relativo a la duración del período respecto a la primera medición')
+ax1.legend(loc=4)
+plt.show()    

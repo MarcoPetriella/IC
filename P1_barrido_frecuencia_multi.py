@@ -11,24 +11,24 @@ Este script realiza un barrido en frecuencias utilizando la salida y entrada de 
 Utiliza la libreria pyaudio para generar las señales de salida y la entrada de adquisición.
 El script lanza dos thread o hilos que se ejecutan contemporaneamente: 
 uno para la generación de la señal (producer) y otro para la adquisicón (consumer).
-El proceso está programado para que el hilo productor envie una señal y habilite en ese momento la adquisición del hilo consumidor.
+El script está programado para que el hilo productor envie una señal y habilite en ese momento la adquisición del hilo consumidor.
 Se utilizan dos semaforos para la interección entre threads: 
     - semaphore1 indica el comienzo de cada paso en el barrido de frecuencia y avisa al consumidor que puede comenzar la adquisición
-    - semaphore2 indica que el hilo consumidor ya ha adquirido la señal y por lo tanto se puede comenzar la adquisición de siguiente paso
+    - semaphore2 indica que el hilo consumidor ya ha adquirido la señal y por lo tanto se puede comenzar la adquisición del siguiente paso
 La señal enviada se guarda en el array data_send, donde cada fila indica un paso del barrido 
 La señal adquirida se guarda en el array data_acq, donde cada fila indica un paso del barrido 
 
 Algunas dudas:
-    - el buffer donde se lee la adquisición guarda datos de la adquisicón correspondiente al paso anterior. Para evitar esto se borran 
+    - El buffer donde se lee la adquisición guarda datos de la adquisicón correspondiente al paso anterior. Para evitar esto se borran 
     los primeros datos del buffer, pero no es muy profesional. La cantidad de datos agregados parece ser independiente del tiempo de adquisición
     o la duración de la señal enviada.
-    - la señal digital que se envia debe ser cuatro veces mas larga que la que definitivamente se envia analógicamente. No entiendo porqué.
+    - La señal digital que se envia debe ser cuatro veces mas larga que la que se envía analógicamente. No entiendo porqué.
 
 Falta:
     - mejorar la interrupción del script por el usuario. Por el momento termina únicamente cuando termina la corrida.
 
-Al final de script se agregan dos secciones para verificar el correcto funcionamiento del script y para medir el retardo
-entre mediciones iguales.
+Al final del script se agregan dos secciones para verificar el correcto funcionamiento del script y para medir el retardo
+entre mediciones iguales. En mi pc de escritorio el retardo entre señales medidas es de +/- 3 ms.
 
 
 Parametros
@@ -65,8 +65,8 @@ pylab.rcParams.update(params)
 
 fs = 44100 # frecuencia de sampleo en Hz
 frec_ini_hz = 840 # frecuencia inicial de barrido en Hz
-steps = 10 # cantidad de pasos del barrido
-delta_frec_hz = -40 # paso del barrido en Hz
+steps = 50 # cantidad de pasos del barrido
+delta_frec_hz = 0 # paso del barrido en Hz
 duration_sec_send = 0.5 # duracion de la señal de salida de cada paso en segundos
 duration_sec_acq = 0.70# duracion de la adquisicón de cada paso en segundos
 A = 0.1 # Amplitud de la señal de salida
@@ -235,7 +235,7 @@ retardos = np.array([])
 for i in range(steps):
     
     data_acq_i = data_acq[i,:]     
-    corr = np.correlate(data_acq[0,:] - np.mean(data_acq[0,:]),data_acq_i - np.mean(data_acq_i),mode='full')
+    corr = np.correlate(data_acq[20,:] - np.mean(data_acq[20,:]),data_acq_i - np.mean(data_acq_i),mode='full')
     pos_max = np.argmax(corr) - len(data_acq_i)
     retardos = np.append(retardos,pos_max/fs)
 

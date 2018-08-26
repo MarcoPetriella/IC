@@ -31,8 +31,8 @@ Falta:
     - Mejorar la interrupción del script por el usuario. Por el momento termina únicamente cuando termina la corrida.
 
 Al final del script se agregan dos secciones para verificar el correcto funcionamiento del script y para medir el retardo
-entre mediciones iguales (en este caso es necesario que delta_frec_hz = 0). En mi pc de escritorio el retardo entre señales medidas está dentro de +/- 3 ms, que puede considerarse como la 
-variabilidad del retardo entre el envío de la señal y la adquisición.
+entre mediciones iguales (en este caso es necesario que delta_frec_hz = 0). En mi pc de escritorio el retardo entre señales medidas está dentro
+de +/- 3 ms, que puede considerarse como la variabilidad del retardo entre el envío de la señal y la adquisición.
 
 
 Parametros

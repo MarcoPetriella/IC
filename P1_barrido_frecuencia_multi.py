@@ -19,16 +19,20 @@ La señal enviada se guarda en el array data_send, donde cada fila indica un pas
 La señal adquirida se guarda en el array data_acq, donde cada fila indica un paso del barrido 
 
 Algunas dudas:
+--------------
     - El buffer donde se lee la adquisición guarda datos de la adquisicón correspondiente al paso anterior. Para evitar esto se borran 
     los primeros datos del buffer, pero no es muy profesional. La cantidad de datos agregados parece ser independiente del tiempo de adquisición
     o la duración de la señal enviada.
     - La señal digital que se envia debe ser cuatro veces mas larga que la que se envía analógicamente. No entiendo porqué.
+    - Se puede mejorar la variabilidad en el retardo entre señal enviada y adquirida? Es decir se puede mejorar la sincronización entre los dos procesos?
 
 Falta:
+------
     - Mejorar la interrupción del script por el usuario. Por el momento termina únicamente cuando termina la corrida.
 
 Al final del script se agregan dos secciones para verificar el correcto funcionamiento del script y para medir el retardo
-entre mediciones iguales. En mi pc de escritorio el retardo entre señales medidas es de +/- 3 ms.
+entre mediciones iguales (en este caso es necesario que delta_frec_hz = 0). En mi pc de escritorio el retardo entre señales medidas está dentro de +/- 3 ms, que puede considerarse como la 
+variabilidad del retardo entre el envío de la señal y la adquisición.
 
 
 Parametros
@@ -68,7 +72,7 @@ frec_ini_hz = 840 # frecuencia inicial de barrido en Hz
 steps = 50 # cantidad de pasos del barrido
 delta_frec_hz = 0 # paso del barrido en Hz
 duration_sec_send = 0.5 # duracion de la señal de salida de cada paso en segundos
-duration_sec_acq = 0.70# duracion de la adquisicón de cada paso en segundos
+duration_sec_acq = 0.7 # duracion de la adquisicón de cada paso en segundos
 A = 0.1 # Amplitud de la señal de salida
 
 chunk_acq = int(fs*duration_sec_acq)

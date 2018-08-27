@@ -34,10 +34,11 @@ Al final del script se agregan dos secciones para verificar el correcto funciona
 entre mediciones iguales (en este caso es necesario que delta_frec_hz = 0). En mi pc de escritorio el retardo entre señales medidas está dentro
 de +/- 3 ms, que puede considerarse como la variabilidad del retardo entre el envío de la señal y la adquisición.
 
+
 Cambios:
 --------
 
-- Cambio semaforo por lock.
+- Cambio semaforo por lock. Mejora la sincronización en +/- 1 ms
 
 
 Parametros
@@ -77,7 +78,7 @@ frec_ini_hz = 840 # frecuencia inicial de barrido en Hz
 steps = 50 # cantidad de pasos del barrido
 delta_frec_hz = 0 # paso del barrido en Hz
 duration_sec_send = 0.5 # duracion de la señal de salida de cada paso en segundos
-duration_sec_acq = 0.7 # duracion de la adquisicón de cada paso en segundos
+duration_sec_acq = 0.1 # duracion de la adquisicón de cada paso en segundos
 A = 0.1 # Amplitud de la señal de salida
 
 chunk_acq = int(fs*duration_sec_acq)

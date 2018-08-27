@@ -34,6 +34,11 @@ Al final del script se agregan dos secciones para verificar el correcto funciona
 entre mediciones iguales (en este caso es necesario que delta_frec_hz = 0). En mi pc de escritorio el retardo entre señales medidas está dentro
 de +/- 3 ms, que puede considerarse como la variabilidad del retardo entre el envío de la señal y la adquisición.
 
+Cambios:
+--------
+
+- Cambio semaforo por lock.
+
 
 Parametros
 ----------
@@ -102,9 +107,9 @@ stream_output = p.open(format=pyaudio.paFloat32,
 
 
 # Defino los semaforos para sincronizar la señal y la adquisicion
-semaphore1 = threading.Semaphore() # Este semaforo es para asegurar que la adquisicion este siempre dentro de la señal enviada
-semaphore2 = threading.Semaphore() # Este semaforo es para asegurar que no se envie una nueva señal antes de haber adquirido y guardado la anterior
-semaphore1.acquire() # Inicializa el semaforo, lo pone en cero.
+lock1 = threading.Lock() # Este lock es para asegurar que la adquisicion este siempre dentro de la señal enviada
+lock2 = threading.Lock() # Este lock es para asegurar que no se envie una nueva señal antes de haber adquirido y guardado la anterior
+lock1.acquire() # Inicializa el lock, lo pone en cero.
 
 # Defino el thread que envia la señal
 data_send = np.zeros([steps,chunk_send],dtype=np.float32)  # aqui guardo la señal enviada
@@ -129,8 +134,8 @@ def producer(steps, delta_frec):
         print ('Empieza Productor: '+ str(i))
         i = i + 1       
         
-        semaphore2.acquire() # Se da por avisado que terminó el step anterior
-        semaphore1.release() # Avisa al consumidor que comienza la adquisicion
+        lock2.acquire() # Se da por avisado que terminó el step anterior
+        lock1.release() # Avisa al consumidor que comienza la adquisicion
         
         # Envia la señal y la guarda en el array
         stream_output.start_stream()
@@ -147,7 +152,7 @@ def consumer():
     global consumer_exit
     j = 0
     while(j<steps):
-        semaphore1.acquire() # Se da por avisado que que el productor comenzó un nuevo step
+        lock1.acquire() # Se da por avisado que que el productor comenzó un nuevo step
         
         # Adquiere la señal y la guarda en el array
         stream_input.start_stream()
@@ -160,7 +165,7 @@ def consumer():
         print ('Termina Consumidor: '+ str(j))
         print ('')
         j = j + 1
-        semaphore2.release() # Avisa al productor que terminó de escribir los datos y puede comenzar con el próximo step
+        lock2.release() # Avisa al productor que terminó de escribir los datos y puede comenzar con el próximo step
 
     consumer_exit = True  
        

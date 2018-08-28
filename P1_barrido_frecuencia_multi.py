@@ -79,11 +79,11 @@ pylab.rcParams.update(params)
 
 
 fs = 44100 # frecuencia de sampleo en Hz
-frec_ini_hz = 840 # frecuencia inicial de barrido en Hz
+frec_ini_hz = 440 # frecuencia inicial de barrido en Hz
 steps = 50 # cantidad de pasos del barrido
 delta_frec_hz = 0 # paso del barrido en Hz
-duration_sec_send = 1 # duracion de la señal de salida de cada paso en segundos
-duration_sec_acq = duration_sec_send + 0.1 # duracion de la adquisicón de cada paso en segundos
+duration_sec_send = 0.3 # duracion de la señal de salida de cada paso en segundos
+duration_sec_acq = duration_sec_send + 0.2 # duracion de la adquisicón de cada paso en segundos
 A = 0.1 # Amplitud de la señal de salida
 
 
@@ -130,11 +130,18 @@ def producer(steps, delta_frec):
     while(i<steps):
         f = frec_ini_hz + delta_frec_hz*i
         
+        ## Seno
         samples = (A*np.sin(2*np.pi*np.arange(1*chunk_send)*f/fs)).astype(np.float32) 
         samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
-        #samples = np.append(samples, (A/2*np.sin(2*np.pi*np.arange(1*int(fs*0.1))*f/fs)).astype(np.float32))
+        
+        ## Cuadrada
+        #samples = A*signal.square(2*np.pi*np.arange(1*f/fs).astype(np.float32)  
+        #samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))        
+        
+        ## Chirp
+        #samples = (signal.chirp(np.arange(chunk_send)/fs, frec_ini_hz, duration_sec_send, frec_ini_hz+500, method='linear', phi=0, vertex_zero=True)).astype(np.float32)  
         #samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
-        #samples = A*signal.square(2*np.pi*np.arange(np.dtype(np.float32).itemsize*chunk_send)*f/fs).astype(np.float32)  
+        
         data_send[i][:] = samples[0:chunk_send]
         frecs_send[i] = f
         
@@ -248,11 +255,13 @@ plt.show()
 
 ## Estudo del retardo en caso que delta_frec = 0
 
+i_comp = 20
+
 retardos = np.array([])
 for i in range(steps):
     
     data_acq_i = data_acq[i,:]     
-    corr = np.correlate(data_acq[20,:] - np.mean(data_acq[20,:]),data_acq_i - np.mean(data_acq_i),mode='full')
+    corr = np.correlate(data_acq[20,:] - np.mean(data_acq[i_comp,:]),data_acq_i - np.mean(data_acq_i),mode='full')
     pos_max = np.argmax(corr) - len(data_acq_i)
     retardos = np.append(retardos,pos_max/fs)
 
@@ -263,7 +272,7 @@ ax = fig.add_axes([.15, .15, .8, .8])
 ax.hist(1000*retardos,bins=1000, rwidth =0.99)    
 ax.set_xlabel(u'Retardo [ms]')
 ax.set_ylabel('Frecuencia [eventos]')
-ax.set_title(u'Histograma de retardo respecto a la primera medición')
+ax.set_title(u'Histograma de retardo respecto a la i = ' + str(i_comp) + ' medición')
 ax1.legend(loc=4)
 plt.show()    
 
@@ -273,7 +282,7 @@ ax = fig.add_axes([.15, .15, .8, .8])
 ax.hist(retardos*frec_ini_hz,bins=100, rwidth =0.99)    
 ax.set_xlabel(u'Retardo relativo [periodo]')
 ax.set_ylabel('Frecuencia [eventos]')
-ax.set_title(u'Histograma de retardo relativo a la duración del período respecto a la primera medición')
+ax.set_title(u'Histograma de retardo relativo a la duración del período respecto a la i = ' + str(i_comp) + ' medición')
 ax1.legend(loc=4)
 plt.show()    
 

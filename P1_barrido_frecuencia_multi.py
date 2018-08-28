@@ -36,16 +36,15 @@ Falta:
 ------
     - Mejorar la interrupción del script por el usuario. Por el momento termina únicamente cuando termina la corrida.
 
-Cambios:
+Notas:
 --------
 - Cambio semaforo por lock. Mejora la sincronización en +/- 1 ms
 - Define un chunk_acq_eff que tiene en cuenta el delay inicial
-
-Notas: 
-------
 - Cambiar Event por Lock no cambia mucho
 - Cuando duration_sec_send > duration_sec_adq la variabilidad del retardo entre los procesos es aprox +/- 1 ms, salvo para la primera medición
 - Cuando duration_sec_send < duration_sec_adq la variabilidad del retardo es muchas veces nula, salvo para la primera medición
+- Obligo a que la duración de adquisición  > duración de la señal enviada para mejorar la sincronización.
+
 
 Parametros:
 -----------
@@ -83,9 +82,10 @@ fs = 44100 # frecuencia de sampleo en Hz
 frec_ini_hz = 840 # frecuencia inicial de barrido en Hz
 steps = 50 # cantidad de pasos del barrido
 delta_frec_hz = 0 # paso del barrido en Hz
-duration_sec_send = 0.2 # duracion de la señal de salida de cada paso en segundos
-duration_sec_acq = 0.5 # duracion de la adquisicón de cada paso en segundos
+duration_sec_send = 1 # duracion de la señal de salida de cada paso en segundos
+duration_sec_acq = duration_sec_send + 0.1 # duracion de la adquisicón de cada paso en segundos
 A = 0.1 # Amplitud de la señal de salida
+
 
 p = pyaudio.PyAudio()
 

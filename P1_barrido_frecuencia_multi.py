@@ -77,21 +77,29 @@ params = {'legend.fontsize': 'medium',
          'ytick.labelsize':'medium'}
 pylab.rcParams.update(params)
 
-
-fs = 44100 # frecuencia de sampleo en Hz
-frec_ini_hz = 440 # frecuencia inicial de barrido en Hz
+# Parametros
+fs = 44100*8 # frecuencia de sampleo en Hz
+frec_ini_hz = 10 # frecuencia inicial de barrido en Hz
+frec_fin_hz = 40000 # frecuencia inicial de barrido en Hz
 steps = 50 # cantidad de pasos del barrido
-delta_frec_hz = 0 # paso del barrido en Hz
 duration_sec_send = 0.3 # duracion de la señal de salida de cada paso en segundos
-duration_sec_acq = duration_sec_send + 0.2 # duracion de la adquisicón de cada paso en segundos
 A = 0.1 # Amplitud de la señal de salida
 
+# Parametros dependientes
+if steps == 1: 
+    delta_frec_hz = 0.
+    frec_fin_hz = frec_ini_hz
+else:
+    delta_frec_hz = (frec_fin_hz-frec_ini_hz)/(steps-1) # paso del barrido en Hz
+    
+duration_sec_acq = duration_sec_send + 0.2 # duracion de la adquisicón de cada paso en segundos
 
+# Inicia pyaudio
 p = pyaudio.PyAudio()
 
+# Defino los buffers de lectura y escritura
 chunk_send = int(fs*duration_sec_send)
 chunk_acq = int(fs*duration_sec_acq)
-
 
 # defino el stream del parlante
 stream_output = p.open(format=pyaudio.paFloat32,
@@ -102,6 +110,7 @@ stream_output = p.open(format=pyaudio.paFloat32,
                 
 )
 
+# Defino un buffer de lectura efectivo que tiene en cuenta el delay de la medición
 chunk_delay = int(fs*stream_output.get_output_latency()) 
 chunk_acq_eff = chunk_acq + chunk_delay
 # Defino el stream del microfono
@@ -109,10 +118,8 @@ stream_input = p.open(format = pyaudio.paInt16,
                 channels = 1,
                 rate = fs,
                 input = True,
-                frames_per_buffer = chunk_acq_eff,
+                frames_per_buffer = chunk_acq_eff*p.get_sample_size(pyaudio.paInt16),
 )
-
-
 
 # Defino los semaforos para sincronizar la señal y la adquisicion
 lock1 = threading.Lock() # Este lock es para asegurar que la adquisicion este siempre dentro de la señal enviada
@@ -123,7 +130,6 @@ lock1.acquire() # Inicializa el lock, lo pone en cero.
 data_send = np.zeros([steps,chunk_send],dtype=np.float32)  # aqui guardo la señal enviada
 frecs_send = np.zeros(steps)   # aqui guardo las frecuencias
 
-tic = datetime.datetime.now()
 def producer(steps, delta_frec):  
     global producer_exit
     i = 0
@@ -139,7 +145,7 @@ def producer(steps, delta_frec):
         #samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))        
         
         ## Chirp
-        #samples = (signal.chirp(np.arange(chunk_send)/fs, frec_ini_hz, duration_sec_send, frec_ini_hz+500, method='linear', phi=0, vertex_zero=True)).astype(np.float32)  
+        #samples = (signal.chirp(np.arange(chunk_send)/fs, frec_ini_hz, duration_sec_send, frec_fin_hz, method='linear', phi=0, vertex_zero=True)).astype(np.float32)  
         #samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
         
         data_send[i][:] = samples[0:chunk_send]
@@ -162,6 +168,7 @@ def producer(steps, delta_frec):
         
 # Defino el thread que adquiere la señal        
 data_acq = np.zeros([steps,chunk_acq],dtype=np.int16)  # aqui guardo la señal adquirida
+
 def consumer():
     global consumer_exit
     j = 0
@@ -195,7 +202,7 @@ t2.start()
 
      
 while(not producer_exit or not consumer_exit):
-    time.sleep(np.max([duration_sec_acq,duration_sec_send]))
+    time.sleep(0.2)
 
 
     
@@ -210,7 +217,7 @@ p.terminate()
 ### ANALISIS de la señal adquirida
 
 # Elijo la frecuencia
-ind_frec = 1
+ind_frec = 27
 
 
 ### Muestra la serie temporal de las señales enviadas y adquiridas
@@ -255,13 +262,13 @@ plt.show()
 
 ## Estudo del retardo en caso que delta_frec = 0
 
-i_comp = 20
+i_comp = 10
 
 retardos = np.array([])
 for i in range(steps):
     
     data_acq_i = data_acq[i,:]     
-    corr = np.correlate(data_acq[20,:] - np.mean(data_acq[i_comp,:]),data_acq_i - np.mean(data_acq_i),mode='full')
+    corr = np.correlate(data_acq[i_comp,:] - np.mean(data_acq[i_comp,:]),data_acq_i - np.mean(data_acq_i),mode='full')
     pos_max = np.argmax(corr) - len(data_acq_i)
     retardos = np.append(retardos,pos_max/fs)
 

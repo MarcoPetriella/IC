@@ -7,6 +7,8 @@ Created on Fri Aug 24 12:36:24 2018
 
 
 """
+Descripción:
+------------
 Este script realiza un barrido en frecuencias utilizando la salida y entrada de audio como emisor-receptor.
 Utiliza la libreria pyaudio para generar las señales de salida y la entrada de adquisición.
 El script lanza dos thread o hilos que se ejecutan contemporaneamente: 
@@ -17,6 +19,10 @@ Se utilizan dos semaforos para la interección entre threads:
     - semaphore2: señala que el hilo consumidor ya ha adquirido la señal y por lo tanto se puede comenzar la adquisición del siguiente paso del barrido.
 La señal enviada se guarda en el array data_send, donde cada fila indica un paso del barrido 
 La señal adquirida se guarda en el array data_acq, donde cada fila indica un paso del barrido 
+
+Al final del script se agregan dos secciones para verificar el correcto funcionamiento del script y para medir el retardo
+entre mediciones iguales (en este caso es necesario que delta_frec_hz = 0). En mi pc de escritorio el retardo entre señales medidas está dentro
+de +/- 3 ms, que puede considerarse como la variabilidad del retardo entre el envío de la señal y la adquisición.
 
 Algunas dudas:
 --------------
@@ -30,11 +36,6 @@ Falta:
 ------
     - Mejorar la interrupción del script por el usuario. Por el momento termina únicamente cuando termina la corrida.
 
-Al final del script se agregan dos secciones para verificar el correcto funcionamiento del script y para medir el retardo
-entre mediciones iguales (en este caso es necesario que delta_frec_hz = 0). En mi pc de escritorio el retardo entre señales medidas está dentro
-de +/- 3 ms, que puede considerarse como la variabilidad del retardo entre el envío de la señal y la adquisición.
-
-
 Cambios:
 --------
 - Cambio semaforo por lock. Mejora la sincronización en +/- 1 ms
@@ -43,10 +44,11 @@ Cambios:
 Notas: 
 ------
 - Cambiar Event por Lock no cambia mucho
+- Cuando duration_sec_send > duration_sec_adq la variabilidad del retardo entre los procesos es aprox +/- 1 ms, salvo para la primera medición
+- Cuando duration_sec_send < duration_sec_adq la variabilidad del retardo es muchas veces nula, salvo para la primera medición
 
-
-Parametros
-----------
+Parametros:
+-----------
 fs = 44100 # frecuencia de sampleo en Hz
 frec_ini_hz = 440 # frecuencia inicial de barrido en Hz
 steps = 10 # cantidad de pasos del barrido
@@ -161,7 +163,7 @@ def consumer():
         # Toma el lock, adquiere la señal y la guarda en el array
         lock1.acquire()
         stream_input.start_stream()
-        data_i = stream_input.read(chunk_delay)  
+        stream_input.read(chunk_delay)  
         data_i = stream_input.read(chunk_acq)  
         stream_input.stop_stream()   
                 

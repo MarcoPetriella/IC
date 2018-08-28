@@ -48,12 +48,11 @@ Notas:
 
 Parametros:
 -----------
-fs = 44100 # frecuencia de sampleo en Hz
-frec_ini_hz = 440 # frecuencia inicial de barrido en Hz
-steps = 10 # cantidad de pasos del barrido
-delta_frec_hz = 50 # paso del barrido en Hz
-duration_sec_send = 2 # duracion de la señal de salida de cada paso en segundos
-duration_sec_acq = 0.2 # duracion de la adquisicón de cada paso en segundos
+fs = 44100*8 # frecuencia de sampleo en Hz
+frec_ini_hz = 10 # frecuencia inicial de barrido en Hz
+frec_fin_hz = 40000 # frecuencia inicial de barrido en Hz
+steps = 50 # cantidad de pasos del barrido
+duration_sec_send = 0.3 # duracion de la señal de salida de cada paso en segundos
 A = 0.1 # Amplitud de la señal de salida
 
 """

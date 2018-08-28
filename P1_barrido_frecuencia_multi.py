@@ -37,7 +37,6 @@ de +/- 3 ms, que puede considerarse como la variabilidad del retardo entre el en
 
 Cambios:
 --------
-
 - Cambio semaforo por lock. Mejora la sincronización en +/- 1 ms
 - Define un chunk_acq_eff que tiene en cuenta el delay inicial
 

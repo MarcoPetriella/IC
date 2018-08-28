@@ -39,6 +39,11 @@ Cambios:
 --------
 
 - Cambio semaforo por lock. Mejora la sincronización en +/- 1 ms
+- Define un chunk_acq_eff que tiene en cuenta el delay inicial
+
+Notas: 
+------
+- Cambiar Event por Lock no cambia mucho
 
 
 Parametros
@@ -77,23 +82,15 @@ fs = 44100 # frecuencia de sampleo en Hz
 frec_ini_hz = 840 # frecuencia inicial de barrido en Hz
 steps = 50 # cantidad de pasos del barrido
 delta_frec_hz = 0 # paso del barrido en Hz
-duration_sec_send = 0.5 # duracion de la señal de salida de cada paso en segundos
-duration_sec_acq = 0.1 # duracion de la adquisicón de cada paso en segundos
+duration_sec_send = 0.2 # duracion de la señal de salida de cada paso en segundos
+duration_sec_acq = 0.5 # duracion de la adquisicón de cada paso en segundos
 A = 0.1 # Amplitud de la señal de salida
-
-chunk_acq = int(fs*duration_sec_acq)
-chunk_send = int(fs*duration_sec_send)
 
 p = pyaudio.PyAudio()
 
-   
-# Defino el stream del microfono
-stream_input = p.open(format = pyaudio.paInt16,
-                channels = 1,
-                rate = fs,
-                input = True,
-                frames_per_buffer = chunk_acq,
-)
+chunk_send = int(fs*duration_sec_send)
+chunk_acq = int(fs*duration_sec_acq)
+
 
 # defino el stream del parlante
 stream_output = p.open(format=pyaudio.paFloat32,
@@ -104,7 +101,16 @@ stream_output = p.open(format=pyaudio.paFloat32,
                 
 )
 
-#print (stream_output.get_output_latency()*1000)
+chunk_delay = int(fs*stream_output.get_output_latency()) 
+chunk_acq_eff = chunk_acq + chunk_delay
+# Defino el stream del microfono
+stream_input = p.open(format = pyaudio.paInt16,
+                channels = 1,
+                rate = fs,
+                input = True,
+                frames_per_buffer = chunk_acq_eff,
+)
+
 
 
 # Defino los semaforos para sincronizar la señal y la adquisicion
@@ -135,10 +141,9 @@ def producer(steps, delta_frec):
         print ('Empieza Productor: '+ str(i))
         i = i + 1       
         
-        lock2.acquire() # Se da por avisado que terminó el step anterior
-        lock1.release() # Avisa al consumidor que comienza la adquisicion
-        
-        # Envia la señal y la guarda en el array
+        # Se entera que se guardó el paso anterior (lock2), avisa que comienza el nuevo (lock1), y envia la señal
+        lock2.acquire() 
+        lock1.release() 
         stream_output.start_stream()
         stream_output.write(samples)
         stream_output.stop_stream()        
@@ -153,14 +158,14 @@ def consumer():
     global consumer_exit
     j = 0
     while(j<steps):
-        lock1.acquire() # Se da por avisado que que el productor comenzó un nuevo step
         
-        # Adquiere la señal y la guarda en el array
+        # Toma el lock, adquiere la señal y la guarda en el array
+        lock1.acquire()
         stream_input.start_stream()
-        data_i = stream_input.read(int(fs*stream_output.get_output_latency())) # esto lo pongo porque el buffer parece quedar lleno de la medicion anterior
+        data_i = stream_input.read(chunk_delay)  
         data_i = stream_input.read(chunk_acq)  
-        stream_input.stop_stream()      
-        
+        stream_input.stop_stream()   
+                
         data_acq[j][:] = np.frombuffer(data_i, dtype=np.int16)
         
         print ('Termina Consumidor: '+ str(j))
@@ -254,7 +259,7 @@ for i in range(steps):
     
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.15, .15, .8, .8])
-ax.hist(1000*retardos,bins=10, rwidth =0.99)    
+ax.hist(1000*retardos,bins=1000, rwidth =0.99)    
 ax.set_xlabel(u'Retardo [ms]')
 ax.set_ylabel('Frecuencia [eventos]')
 ax.set_title(u'Histograma de retardo respecto a la primera medición')
@@ -264,9 +269,12 @@ plt.show()
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.15, .15, .8, .8])
-ax.hist(retardos*frec_ini_hz,bins=10, rwidth =0.99)    
+ax.hist(retardos*frec_ini_hz,bins=100, rwidth =0.99)    
 ax.set_xlabel(u'Retardo relativo [periodo]')
 ax.set_ylabel('Frecuencia [eventos]')
 ax.set_title(u'Histograma de retardo relativo a la duración del período respecto a la primera medición')
 ax1.legend(loc=4)
 plt.show()    
+
+#%%
+plt.plot(np.transpose(data_acq))

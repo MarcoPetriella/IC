@@ -140,11 +140,11 @@ def producer(steps, delta_frec):
         samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
         
         ## Cuadrada
-#        samples = A*signal.square(2*np.pi*np.arange(chunk_send)*frec_ini_hz/fs).astype(np.float32)  
+#        samples = A*signal.square(2*np.pi*np.arange(chunk_send)*f/fs).astype(np.float32)  
 #        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))   
         
         ## Chirp
-        #samples = (signal.chirp(np.arange(chunk_send)/fs, frec_ini_hz, duration_sec_send, frec_fin_hz, method='linear', phi=0, vertex_zero=True)).astype(np.float32)  
+        #samples = (signal.chirp(np.arange(chunk_send)/fs, frec_ini_hz, duration_sec_send, f, method='linear', phi=0, vertex_zero=True)).astype(np.float32)  
         #samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
         
         data_send[i][:] = samples[0:chunk_send]

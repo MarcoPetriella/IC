@@ -38,7 +38,7 @@ Falta:
 
 Notas:
 --------
-- Cambio semaforo por lock. Mejora la sincronización en +/- 1 ms
+- Cambio semaforo por lock. Mejora la sincronización en +/- 1 ms. 
 - Define un chunk_acq_eff que tiene en cuenta el delay inicial
 - Cambiar Event por Lock no cambia mucho
 - Cuando duration_sec_send > duration_sec_adq la variabilidad del retardo entre los procesos es aprox +/- 1 ms, salvo para la primera medición
@@ -77,12 +77,12 @@ params = {'legend.fontsize': 'medium',
 pylab.rcParams.update(params)
 
 # Parametros
-fs = 44100*8 # frecuencia de sampleo en Hz
-frec_ini_hz = 10 # frecuencia inicial de barrido en Hz
-frec_fin_hz = 10 # frecuencia inicial de barrido en Hz
+fs = 44100 # frecuencia de sampleo en Hz
+frec_ini_hz = 5 # frecuencia inicial de barrido en Hz
+frec_fin_hz = 5 # frecuencia final de barrido en Hz
 steps = 10 # cantidad de pasos del barrido
 duration_sec_send = 1 # duracion de la señal de salida de cada paso en segundos
-A = 1 # Amplitud de la señal de salida
+A = 0.5 # Amplitud de la señal de salida
 
 # Parametros dependientes
 if steps == 1: 
@@ -136,12 +136,12 @@ def producer(steps, delta_frec):
         f = frec_ini_hz + delta_frec_hz*i
         
         ## Seno
-#        samples = (A*np.sin(2*np.pi*np.arange(1*chunk_send)*f/fs)).astype(np.float32) 
-#        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
+        samples = (A*np.sin(2*np.pi*np.arange(1*chunk_send)*f/fs)).astype(np.float32) 
+        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
         
         ## Cuadrada
-        samples = A*signal.square(2*np.pi*np.arange(chunk_send)*frec_ini_hz/fs).astype(np.float32)  
-        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))   
+#        samples = A*signal.square(2*np.pi*np.arange(chunk_send)*frec_ini_hz/fs).astype(np.float32)  
+#        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))   
         
         ## Chirp
         #samples = (signal.chirp(np.arange(chunk_send)/fs, frec_ini_hz, duration_sec_send, frec_fin_hz, method='linear', phi=0, vertex_zero=True)).astype(np.float32)  
@@ -216,7 +216,7 @@ p.terminate()
 ### ANALISIS de la señal adquirida
 
 # Elijo la frecuencia
-ind_frec = 0
+ind_frec = 5
 
 
 ### Muestra la serie temporal de las señales enviadas y adquiridas
@@ -224,7 +224,7 @@ t_send = np.linspace(0,np.size(data_send,1)-1,np.size(data_send,1))/fs
 t_adq = np.linspace(0,np.size(data_acq,1)-1,np.size(data_acq,1))/fs
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
-ax = fig.add_axes([.15, .15, .8, .8])
+ax = fig.add_axes([.15, .15, .75, .8])
 ax1 = ax.twinx()
 ax.plot(t_send,data_send[ind_frec,:], label=u'Señal enviada: ' + str(frecs_send[ind_frec]) + ' Hz')
 ax1.plot(t_adq,data_acq[ind_frec,:],color='red', label=u'Señal adquirida')
@@ -246,7 +246,7 @@ frec_acq = np.linspace(0,int(chunk_acq/2),int(chunk_acq/2+1))
 frec_acq = frec_acq/duration_sec_acq
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
-ax = fig.add_axes([.1, .1, .8, .8])
+ax = fig.add_axes([.1, .1, .75, .8])
 ax1 = ax.twinx()
 ax.plot(frec_send,fft_send, label='Frec enviada: ' + str(frecs_send[ind_frec]) + ' Hz')
 ax1.plot(frec_acq,fft_acq,color='red', label=u'Señal adquirida')
@@ -297,3 +297,23 @@ plt.plot(np.transpose(data_acq))
 
 
 plt.plot(np.mean(data_acq[2:,:],axis = 0))
+
+
+
+#%%
+
+Is = 1.0*1e-12
+Vt = 26.0*1e-3
+n = 1.
+
+Vd = np.linspace(-1,1,1000)
+Id = Is*(np.exp(Vd/n/Vt)-1)
+
+Rs = 100
+Vs = 1
+Ir = Vs/Rs - Vd/Rs
+
+
+plt.plot(Vd,Id)
+plt.plot(Vd,Ir)
+

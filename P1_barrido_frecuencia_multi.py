@@ -79,10 +79,10 @@ pylab.rcParams.update(params)
 # Parametros
 fs = 44100*8 # frecuencia de sampleo en Hz
 frec_ini_hz = 10 # frecuencia inicial de barrido en Hz
-frec_fin_hz = 40000 # frecuencia inicial de barrido en Hz
-steps = 50 # cantidad de pasos del barrido
-duration_sec_send = 0.3 # duracion de la señal de salida de cada paso en segundos
-A = 0.1 # Amplitud de la señal de salida
+frec_fin_hz = 10 # frecuencia inicial de barrido en Hz
+steps = 10 # cantidad de pasos del barrido
+duration_sec_send = 1 # duracion de la señal de salida de cada paso en segundos
+A = 1 # Amplitud de la señal de salida
 
 # Parametros dependientes
 if steps == 1: 
@@ -136,12 +136,12 @@ def producer(steps, delta_frec):
         f = frec_ini_hz + delta_frec_hz*i
         
         ## Seno
-        samples = (A*np.sin(2*np.pi*np.arange(1*chunk_send)*f/fs)).astype(np.float32) 
-        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
+#        samples = (A*np.sin(2*np.pi*np.arange(1*chunk_send)*f/fs)).astype(np.float32) 
+#        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
         
         ## Cuadrada
-        #samples = A*signal.square(2*np.pi*np.arange(1*f/fs).astype(np.float32)  
-        #samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))        
+        samples = A*signal.square(2*np.pi*np.arange(chunk_send)*frec_ini_hz/fs).astype(np.float32)  
+        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))   
         
         ## Chirp
         #samples = (signal.chirp(np.arange(chunk_send)/fs, frec_ini_hz, duration_sec_send, frec_fin_hz, method='linear', phi=0, vertex_zero=True)).astype(np.float32)  
@@ -216,7 +216,7 @@ p.terminate()
 ### ANALISIS de la señal adquirida
 
 # Elijo la frecuencia
-ind_frec = 27
+ind_frec = 0
 
 
 ### Muestra la serie temporal de las señales enviadas y adquiridas
@@ -294,3 +294,6 @@ plt.show()
 
 #%%
 plt.plot(np.transpose(data_acq))
+
+
+plt.plot(np.mean(data_acq[2:,:],axis = 0))

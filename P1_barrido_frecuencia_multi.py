@@ -186,6 +186,10 @@ def play_rec(parametros):
                 parametros_output_signal = parametros_output_signal_chs[j]
                 parametros_output_signal['frec'] = f
                 samples[j,0:chunk_send] = function_generator(parametros_output_signal)
+#                if j == 1:
+#                    a = function_generator(parametros_output_signal)
+#                    a[a>0] = a[a>0]*2
+#                    samples[j,0:chunk_send] = a
                 
                 # Guardo las señales de salida
                 data_send[i,:,j] = samples[j,0:chunk_send]
@@ -227,7 +231,7 @@ def play_rec(parametros):
             data_i = np.frombuffer(data_i, dtype=np.int16)
             
             for j in range(input_channels):
-                data_acq[i,:,j] = data_i[j::input_channels]
+                data_acq[i,:,j] = -data_i[j::input_channels]
             
             print ('Termina Consumidor: '+ str(i))
             print ('')
@@ -258,14 +262,33 @@ def play_rec(parametros):
     return data_acq, data_send, frecs_send
  
 
-
+def sincroniza_con_trigger(parametros):
+    
+    data_send = parametros['data_send']
+    data_acq = parametros['data_acq']   
+    trigger_send = data_send[:,:,0]
+    trigger_acq = data_acq[:,:,0]
+        
+    data_acq_corrected = np.zeros([trigger_send.shape[0],trigger_send.shape[1],2])
+    retardos = np.array([])
+    for i in range(data_acq.shape[0]):
+            
+        corr = np.correlate(trigger_send[i,:] - np.mean(trigger_send[i,:]),trigger_acq[i,:] - np.mean(trigger_acq[i,:]),mode='full')
+        pos_max = trigger_acq.shape[1] - np.argmax(corr)
+        retardos = np.append(retardos,pos_max)
+            
+        data_acq_corrected[i,:,0] = data_acq[i,pos_max:pos_max+trigger_send.shape[1],0]
+        data_acq_corrected[i,:,1] = data_acq[i,pos_max:pos_max+trigger_send.shape[1],1]
+        
+        
+    return data_acq_corrected, retardos
 
 #%%
     
 ## Realiza medición y grafica
 parametros = {}
 parametros['fs'] = 44100 
-parametros['steps_frec'] = 50 
+parametros['steps_frec'] = 10 
 parametros['duration_sec_send'] = 0.3
 parametros['input_channels'] = 2
 parametros['output_channels'] = 2
@@ -280,8 +303,42 @@ parametros['frec_fin_hz_ch1'] = 500
 
 data_acq, data_send, frecs_send = play_rec(parametros)
 
+
+
 #%%
 plt.plot(np.transpose(data_acq[:,:,1]))
+
+plt.plot(np.transpose(data_send[:,:,1]))
+
+
+
+#%%
+parametros = {}
+parametros['data_send'] = data_send
+parametros['data_acq']  = data_acq
+
+data_acq_corrected, retardos = sincroniza_con_trigger(parametros)
+
+
+
+#trigger_send = data_send[:,:,0]
+#trigger_acq = data_acq[:,:,0]
+#    
+#data_acq_corrected = np.zeros([trigger_send.shape[0],trigger_send.shape[1],2])
+#retardos = np.array([])
+#for i in range(data_acq.shape[0]):
+#        
+#    corr = np.correlate(trigger_send[i,:] - np.mean(trigger_send[i,:]),trigger_acq[i,:] - np.mean(trigger_acq[i,:]),mode='full')
+#    pos_max = trigger_acq.shape[1] - np.argmax(corr)
+#    retardos = np.append(retardos,pos_max)
+#        
+#    data_acq_corrected[i,:,0] = data_acq[i,pos_max:pos_max+trigger_send.shape[1],0]
+#    data_acq_corrected[i,:,1] = data_acq[i,pos_max:pos_max+trigger_send.shape[1],1]
+#
+#
+#
+#plt.plot(corr)
+
 
 
 #%%

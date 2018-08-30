@@ -86,6 +86,7 @@ def play_rec(parametros):
     steps = parametros['steps'] 
     duration_sec_send = parametros['duration_sec_send'] 
     amplitud = parametros['amplitud']
+    input_channels = parametros['input_channels']
     
     
     # Parametros dependientes
@@ -118,7 +119,7 @@ def play_rec(parametros):
     chunk_acq_eff = chunk_acq + chunk_delay
     # Defino el stream del microfono
     stream_input = p.open(format = pyaudio.paInt16,
-                    channels = 1,
+                    channels = input_channels,
                     rate = fs,
                     input = True,
                     frames_per_buffer = chunk_acq_eff*p.get_sample_size(pyaudio.paInt16),
@@ -149,7 +150,7 @@ def play_rec(parametros):
             #samples = (signal.chirp(np.arange(chunk_send)/fs, frec_ini_hz, duration_sec_send, f, method='linear', phi=0, vertex_zero=True)).astype(np.float32)  
             #samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
             
-            data_send[i][:] = samples[0:chunk_send]
+            data_send[i,:] = samples[0:chunk_send]
             frecs_send[i] = f
             
             print ('Frecuencia: ' + str(f) + ' Hz')
@@ -167,7 +168,7 @@ def play_rec(parametros):
             
             
     # Defino el thread que adquiere la señal        
-    data_acq = np.zeros([steps,chunk_acq],dtype=np.int16)  # aqui guardo la señal adquirida
+    data_acq = np.zeros([steps,chunk_acq,input_channels],dtype=np.int16)  # aqui guardo la señal adquirida
     
     def consumer():
         for i in range(steps):
@@ -178,8 +179,11 @@ def play_rec(parametros):
             stream_input.read(chunk_delay)  
             data_i = stream_input.read(chunk_acq)  
             stream_input.stop_stream()   
-                    
-            data_acq[i][:] = np.frombuffer(data_i, dtype=np.int16)
+            
+            data_i = np.frombuffer(data_i, dtype=np.int16)
+            
+            for j in range(input_channels):
+                data_acq[i,:,j] = data_i[j::input_channels]
             
             print ('Termina Consumidor: '+ str(i))
             print ('')
@@ -209,7 +213,7 @@ def play_rec(parametros):
     
     return data_acq, data_send, frecs_send
  
-
+#%%
 # Parametros
 parametros = {}
 parametros['fs'] = 44100*8 
@@ -250,17 +254,36 @@ plt.plot(np.transpose(dd))
 
 plt.plot(dd[5,:])
 
+
+#%%
+parametros = {}
+parametros['fs'] = 44100*8 
+parametros['frec_ini_hz'] = 500 
+parametros['frec_fin_hz'] = 500 
+parametros['steps'] = 21 
+parametros['amplitud'] = 0.1 
+parametros['frec_ini_hz'] = 500
+parametros['frec_fin_hz'] = 500
+parametros['duration_sec_send'] = 0.1 
+parametros['input_channels'] = 2
+
+data_acq, data_send, frecs_send = play_rec(parametros)
+
+
+plt.plot(np.transpose(data_acq[:,:,1]))
+
+
 #%%
     
         
-    
+
 
 ### ANALISIS de la señal adquirida
 
 # Elijo la frecuencia
 ind_frec = 10
 
-
+fs = 44100*8 
 ### Muestra la serie temporal de las señales enviadas y adquiridas
 t_send = np.linspace(0,np.size(data_send,1)-1,np.size(data_send,1))/fs
 t_adq = np.linspace(0,np.size(data_acq,1)-1,np.size(data_acq,1))/fs

@@ -67,6 +67,7 @@ import datetime
 import time
 import matplotlib.pylab as pylab
 from scipy import signal
+import os
 
 params = {'legend.fontsize': 'medium',
      #     'figure.figsize': (15, 5),
@@ -76,147 +77,188 @@ params = {'legend.fontsize': 'medium',
          'ytick.labelsize':'medium'}
 pylab.rcParams.update(params)
 
-# Parametros
-fs = 44100 # frecuencia de sampleo en Hz
-frec_ini_hz = 5 # frecuencia inicial de barrido en Hz
-frec_fin_hz = 5 # frecuencia final de barrido en Hz
-steps = 10 # cantidad de pasos del barrido
-duration_sec_send = 1 # duracion de la señal de salida de cada paso en segundos
-A = 0.5 # Amplitud de la señal de salida
 
-# Parametros dependientes
-if steps == 1: 
-    delta_frec_hz = 0.
-    frec_fin_hz = frec_ini_hz
-else:
-    delta_frec_hz = (frec_fin_hz-frec_ini_hz)/(steps-1) # paso del barrido en Hz
+def play_rec(parametros):
     
-duration_sec_acq = duration_sec_send + 0.2 # duracion de la adquisicón de cada paso en segundos
-
-# Inicia pyaudio
-p = pyaudio.PyAudio()
-
-# Defino los buffers de lectura y escritura
-chunk_send = int(fs*duration_sec_send)
-chunk_acq = int(fs*duration_sec_acq)
-
-# defino el stream del parlante
-stream_output = p.open(format=pyaudio.paFloat32,
-                channels = 1,
-                rate = fs,
-                output = True,
-                #input_device_index = 4,
-                
-)
-
-# Defino un buffer de lectura efectivo que tiene en cuenta el delay de la medición
-chunk_delay = int(fs*stream_output.get_output_latency()) 
-chunk_acq_eff = chunk_acq + chunk_delay
-# Defino el stream del microfono
-stream_input = p.open(format = pyaudio.paInt16,
-                channels = 1,
-                rate = fs,
-                input = True,
-                frames_per_buffer = chunk_acq_eff*p.get_sample_size(pyaudio.paInt16),
-)
-
-# Defino los semaforos para sincronizar la señal y la adquisicion
-lock1 = threading.Lock() # Este lock es para asegurar que la adquisicion este siempre dentro de la señal enviada
-lock2 = threading.Lock() # Este lock es para asegurar que no se envie una nueva señal antes de haber adquirido y guardado la anterior
-lock1.acquire() # Inicializa el lock, lo pone en cero.
-
-# Defino el thread que envia la señal
-data_send = np.zeros([steps,chunk_send],dtype=np.float32)  # aqui guardo la señal enviada
-frecs_send = np.zeros(steps)   # aqui guardo las frecuencias
-
-def producer(steps, delta_frec):  
-    global producer_exit
-    i = 0
-    while(i<steps):
-        f = frec_ini_hz + delta_frec_hz*i
-        
-        ## Seno
-        samples = (A*np.sin(2*np.pi*np.arange(1*chunk_send)*f/fs)).astype(np.float32) 
-        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
-        
-        ## Cuadrada
-#        samples = A*signal.square(2*np.pi*np.arange(chunk_send)*f/fs).astype(np.float32)  
-#        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))   
-        
-        ## Chirp
-        #samples = (signal.chirp(np.arange(chunk_send)/fs, frec_ini_hz, duration_sec_send, f, method='linear', phi=0, vertex_zero=True)).astype(np.float32)  
-        #samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
-        
-        data_send[i][:] = samples[0:chunk_send]
-        frecs_send[i] = f
-        
-        print ('Frecuencia: ' + str(f) + ' Hz')
-        print ('Empieza Productor: '+ str(i))
-        i = i + 1       
-        
-        # Se entera que se guardó el paso anterior (lock2), avisa que comienza el nuevo (lock1), y envia la señal
-        lock2.acquire() 
-        lock1.release() 
-        stream_output.start_stream()
-        stream_output.write(samples)
-        stream_output.stop_stream()        
-
-    producer_exit = True  
-        
-        
-        
-# Defino el thread que adquiere la señal        
-data_acq = np.zeros([steps,chunk_acq],dtype=np.int16)  # aqui guardo la señal adquirida
-
-def consumer():
-    global consumer_exit
-    j = 0
-    while(j<steps):
-        
-        # Toma el lock, adquiere la señal y la guarda en el array
-        lock1.acquire()
-        stream_input.start_stream()
-        stream_input.read(chunk_delay)  
-        data_i = stream_input.read(chunk_acq)  
-        stream_input.stop_stream()   
-                
-        data_acq[j][:] = np.frombuffer(data_i, dtype=np.int16)
-        
-        print ('Termina Consumidor: '+ str(j))
-        print ('')
-        j = j + 1
-        lock2.release() # Avisa al productor que terminó de escribir los datos y puede comenzar con el próximo step
-
-    consumer_exit = True  
-       
-
-producer_exit = False   
-consumer_exit = False 
-        
-# Inicio los threads    
-t1 = threading.Thread(target=producer, args=[steps,delta_frec_hz])
-t2 = threading.Thread(target=consumer, args=[])
-t1.start()
-t2.start()
-
-     
-while(not producer_exit or not consumer_exit):
-    time.sleep(0.2)
-
-
+    fs = parametros['fs']
+    frec_ini_hz = parametros['frec_ini_hz']
+    frec_fin_hz = parametros['frec_fin_hz']
+    steps = parametros['steps'] 
+    duration_sec_send = parametros['duration_sec_send'] 
+    amplitud = parametros['amplitud']
     
-stream_input.close()
-stream_output.close()
-p.terminate()   
+    
+    # Parametros dependientes
+    if steps == 1: 
+        delta_frec_hz = 0.
+        frec_fin_hz = frec_ini_hz
+    else:
+        delta_frec_hz = (frec_fin_hz-frec_ini_hz)/(steps-1) # paso del barrido en Hz
+        
+    duration_sec_acq = duration_sec_send + 0.2 # duracion de la adquisicón de cada paso en segundos
+    
+    # Inicia pyaudio
+    p = pyaudio.PyAudio()
+    
+    # Defino los buffers de lectura y escritura
+    chunk_send = int(fs*duration_sec_send)
+    chunk_acq = int(fs*duration_sec_acq)
+    
+    # defino el stream del parlante
+    stream_output = p.open(format=pyaudio.paFloat32,
+                    channels = 1,
+                    rate = fs,
+                    output = True,
+                    #input_device_index = 4,
+                    
+    )
+    
+    # Defino un buffer de lectura efectivo que tiene en cuenta el delay de la medición
+    chunk_delay = int(fs*stream_output.get_output_latency()) 
+    chunk_acq_eff = chunk_acq + chunk_delay
+    # Defino el stream del microfono
+    stream_input = p.open(format = pyaudio.paInt16,
+                    channels = 1,
+                    rate = fs,
+                    input = True,
+                    frames_per_buffer = chunk_acq_eff*p.get_sample_size(pyaudio.paInt16),
+    )
+    
+    # Defino los semaforos para sincronizar la señal y la adquisicion
+    lock1 = threading.Lock() # Este lock es para asegurar que la adquisicion este siempre dentro de la señal enviada
+    lock2 = threading.Lock() # Este lock es para asegurar que no se envie una nueva señal antes de haber adquirido y guardado la anterior
+    lock1.acquire() # Inicializa el lock, lo pone en cero.
+    
+    # Defino el thread que envia la señal
+    data_send = np.zeros([steps,chunk_send],dtype=np.float32)  # aqui guardo la señal enviada
+    frecs_send = np.zeros(steps)   # aqui guardo las frecuencias
+    
+    def producer(steps, delta_frec):  
+        for i in range(steps):
+            f = frec_ini_hz + delta_frec_hz*i
+            
+            ## Seno
+            samples = (amplitud*np.sin(2*np.pi*np.arange(1*chunk_send)*f/fs)).astype(np.float32) 
+            samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
+            
+            ## Cuadrada
+    #        samples = A*signal.square(2*np.pi*np.arange(chunk_send)*f/fs, duty=0.5).astype(np.float32)  
+    #        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))   
+            
+            ## Chirp
+            #samples = (signal.chirp(np.arange(chunk_send)/fs, frec_ini_hz, duration_sec_send, f, method='linear', phi=0, vertex_zero=True)).astype(np.float32)  
+            #samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
+            
+            data_send[i][:] = samples[0:chunk_send]
+            frecs_send[i] = f
+            
+            print ('Frecuencia: ' + str(f) + ' Hz')
+            print ('Empieza Productor: '+ str(i))
+            
+            # Se entera que se guardó el paso anterior (lock2), avisa que comienza el nuevo (lock1), y envia la señal
+            lock2.acquire() 
+            lock1.release() 
+            stream_output.start_stream()
+            stream_output.write(samples)
+            stream_output.stop_stream()        
+    
+        producer_exit[0] = True  
+            
+            
+            
+    # Defino el thread que adquiere la señal        
+    data_acq = np.zeros([steps,chunk_acq],dtype=np.int16)  # aqui guardo la señal adquirida
+    
+    def consumer():
+        for i in range(steps):
+            
+            # Toma el lock, adquiere la señal y la guarda en el array
+            lock1.acquire()
+            stream_input.start_stream()
+            stream_input.read(chunk_delay)  
+            data_i = stream_input.read(chunk_acq)  
+            stream_input.stop_stream()   
+                    
+            data_acq[i][:] = np.frombuffer(data_i, dtype=np.int16)
+            
+            print ('Termina Consumidor: '+ str(i))
+            print ('')
+            lock2.release() # Avisa al productor que terminó de escribir los datos y puede comenzar con el próximo step
+    
+        consumer_exit[0] = True  
+           
+    
+    producer_exit = [False]   
+    consumer_exit = [False] 
+            
+    # Inicio los threads    
+    t1 = threading.Thread(target=producer, args=[steps,delta_frec_hz])
+    t2 = threading.Thread(target=consumer, args=[])
+    t1.start()
+    t2.start()
+    
+         
+    while(not producer_exit[0] or not consumer_exit[0]):
+        time.sleep(0.2)
+    
+    
+        
+    stream_input.close()
+    stream_output.close()
+    p.terminate()   
+    
+    return data_acq, data_send, frecs_send
  
 
+# Parametros
+parametros = {}
+parametros['fs'] = 44100*8 
+parametros['frec_ini_hz'] = 500 
+parametros['frec_fin_hz'] = 500 
+parametros['steps'] = 21 
+parametros['amplitud'] = 0.1 
+
+frec_inis = [0,100,1000,15000]
+frec_fins = [100,1000,15000,19000]
+duraciones = [2,1,0.5,0.5]
+
+carpeta_resultdos = 'respuesta_emisor_receptor'
+os.mkdir(carpeta_resultdos)
+
+
+for i in range(4):
+    
+    parametros['frec_ini_hz'] = frec_inis[i]
+    parametros['frec_fin_hz'] = frec_fins[i]
+    parametros['duration_sec_send'] = duraciones[i] 
+
+
+    data_acq, data_send, frecs_send = play_rec(parametros)
+    
+    np.save(os.path.join(carpeta_resultdos, 'data_acq_rango_'+str(i)),data_acq)
+    np.save(os.path.join(carpeta_resultdos, 'data_send_rango_'+str(i)),data_send)
+    np.save(os.path.join(carpeta_resultdos, 'frecs_send_rango_'+str(i)),frecs_send)
+    np.save(os.path.join(carpeta_resultdos, 'parametros_rango_'+str(i)),parametros)
+
+
+i = 0
+dd = np.load(os.path.join(carpeta_resultdos, 'data_acq_rango_' + str(i) + '.npy'))  
+params = np.load(os.path.join(carpeta_resultdos, 'parametros_rango_' + str(i) + '.npy'))
+
+plt.plot(np.transpose(dd))
+
+
+plt.plot(dd[5,:])
 
 #%%
+    
+        
+    
 
 ### ANALISIS de la señal adquirida
 
 # Elijo la frecuencia
-ind_frec = 5
+ind_frec = 10
 
 
 ### Muestra la serie temporal de las señales enviadas y adquiridas

@@ -78,6 +78,24 @@ params = {'legend.fontsize': 'medium',
 pylab.rcParams.update(params)
 
 
+def function_generator(parametros):
+    
+    fs = parametros['fs']
+    frec = parametros['frec']
+    amplitud = parametros['amplitud']
+    duracion = parametros['duracion']
+    tipo = parametros['tipo']
+        
+    if tipo is 'sin':
+        output_signal = (amplitud*np.sin(2*np.pi*np.arange(int(duracion*fs))*frec/fs)).astype(np.float32)  
+    elif tipo is 'square':
+        output_signal = amplitud*signal.square(2*np.pi*np.arange(int(duracion*fs))*frec/fs, duty=0.5).astype(np.float32) 
+    elif tipo is 'ramp':
+        output_signal = amplitud*signal.sawtooth(2*np.pi*np.arange(int(duracion*fs))*frec/fs, width=0.5).astype(np.float32) 
+
+    return output_signal
+
+
 def play_rec(parametros):
     
     # Cargo parametros
@@ -91,11 +109,13 @@ def play_rec(parametros):
     frec_fin_hz = []
     amplitud = []
     delta_frec_hz = []
+    tipo = []
     for i in range(output_channels):
         
         frec_ini_hz.append(parametros['frec_ini_hz_ch' + str(i)])
         frec_fin_hz.append(parametros['frec_fin_hz_ch' + str(i)])     
         amplitud.append(parametros['amplitud_ch' + str(i)])
+        tipo.append(parametros['tipo_ch' + str(i)])
    
         if steps == 1: 
             delta_frec_hz.append(0.)
@@ -103,7 +123,7 @@ def play_rec(parametros):
         else:
             delta_frec_hz.append((frec_fin_hz[i]-frec_ini_hz[i])/(steps-1)) # paso del barrido en Hz
             
-        
+    # Obligo a la duracion de la adquisicion > a la de salida    
     duration_sec_acq = duration_sec_send + 0.1 # duracion de la adquisicón de cada paso en segundos
     
     # Inicia pyaudio
@@ -113,18 +133,18 @@ def play_rec(parametros):
     chunk_send = int(fs*duration_sec_send)
     chunk_acq = int(fs*duration_sec_acq)
     
-    # defino el stream del parlante
+    # Defino el stream del parlante
     stream_output = p.open(format=pyaudio.paFloat32,
                     channels = output_channels,
                     rate = fs,
                     output = True,
-                    #input_device_index = 4,
                     
     )
     
     # Defino un buffer de lectura efectivo que tiene en cuenta el delay de la medición
     chunk_delay = int(fs*stream_output.get_output_latency()) 
     chunk_acq_eff = chunk_acq + chunk_delay
+    
     # Defino el stream del microfono
     stream_input = p.open(format = pyaudio.paInt16,
                     channels = input_channels,
@@ -142,31 +162,38 @@ def play_rec(parametros):
     data_send = np.zeros([steps,chunk_send,output_channels],dtype=np.float32)  # aqui guardo la señal enviada
     frecs_send = np.zeros([steps,output_channels])   # aqui guardo las frecuencias
     
+    # Guardo los parametros de la señal de salida por canal
+    parametros_output_signal_chs = []
+    for i in range(output_channels):
+        para = {}
+        para['fs'] = fs
+        para['amplitud'] = amplitud[i]
+        para['duracion'] = parametros['duration_sec_send']
+        para['tipo'] = tipo[i]
+        
+        parametros_output_signal_chs.append(para)
+          
+    
     def producer(steps, delta_frec):  
         for i in range(steps):
             
+            # Genero las señales de salida
             samples = np.zeros([output_channels,4*chunk_send],dtype = np.float32)
             for j in range(output_channels):
-                f = frec_ini_hz[j] + delta_frec_hz[j]*i
                 
-                samples[j,0:chunk_send] = (amplitud[j]*np.sin(2*np.pi*np.arange(chunk_send)*f/fs)).astype(np.float32)                
+                f = frec_ini_hz[j] + delta_frec_hz[j]*i       
+                                       
+                parametros_output_signal = parametros_output_signal_chs[j]
+                parametros_output_signal['frec'] = f
+                samples[j,0:chunk_send] = function_generator(parametros_output_signal)
                 
+                # Guardo las señales de salida
                 data_send[i,:,j] = samples[j,0:chunk_send]
                 frecs_send[i,j] = f
             
-            samples_tot = np.reshape(samples,4*chunk_send*output_channels,order='F')
+            # Paso la salida a un array de una dimension
+            samples_out = np.reshape(samples,4*chunk_send*output_channels,order='F')
             
-            ## Seno
-#            samples = (amplitud*np.sin(2*np.pi*np.arange(1*chunk_send)*f/fs)).astype(np.float32) 
-#            samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
-            
-            ## Cuadrada
-    #        samples = A*signal.square(2*np.pi*np.arange(chunk_send)*f/fs, duty=0.5).astype(np.float32)  
-    #        samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))   
-            
-            ## Chirp
-            #samples = (signal.chirp(np.arange(chunk_send)/fs, frec_ini_hz, duration_sec_send, f, method='linear', phi=0, vertex_zero=True)).astype(np.float32)  
-            #samples = np.append(samples, np.zeros(3*chunk_send).astype(np.float32))
             
             for j in range(output_channels):
                 print ('Frecuencia ch'+ str(j) +': ' + str(frecs_send[i,j]) + ' Hz')
@@ -177,7 +204,7 @@ def play_rec(parametros):
             lock2.acquire() 
             lock1.release() 
             stream_output.start_stream()
-            stream_output.write(samples_tot)
+            stream_output.write(samples_out)
             stream_output.stop_stream()        
     
         producer_exit[0] = True  
@@ -242,12 +269,14 @@ parametros['steps'] = 50
 parametros['duration_sec_send'] = 0.3
 parametros['input_channels'] = 1
 parametros['output_channels'] = 2
+parametros['tipo_ch0'] = 'sin' 
 parametros['amplitud_ch0'] = 0.1 
 parametros['frec_ini_hz_ch0'] = 500 
 parametros['frec_fin_hz_ch0'] = 500 
+parametros['tipo_ch1'] = 'ramp' 
 parametros['amplitud_ch1'] = 0.1 
 parametros['frec_ini_hz_ch1'] = 500 
-parametros['frec_fin_hz_ch1'] = 5000 
+parametros['frec_fin_hz_ch1'] = 500 
 
 data_acq, data_send, frecs_send = play_rec(parametros)
 

@@ -158,12 +158,8 @@ def play_rec(parametros):
     lock1 = threading.Lock() # Este lock es para asegurar que la adquisicion este siempre dentro de la señal enviada
     lock2 = threading.Lock() # Este lock es para asegurar que no se envie una nueva señal antes de haber adquirido y guardado la anterior
     lock1.acquire() # Inicializa el lock, lo pone en cero.
-    
-    # Defino el thread que envia la señal
-    data_send = np.zeros([steps_frec,chunk_send,output_channels],dtype=np.float32)  # aqui guardo la señal enviada
-    frecs_send = np.zeros([steps_frec,output_channels])   # aqui guardo las frecuencias
-    
-    # Guardo los parametros de la señal de salida por canal
+       
+    # Guardo los parametros de la señal de salida por canal, para usarlos en la funcion function_generator
     parametros_output_signal_chs = []
     for i in range(output_channels):
         para = {}
@@ -173,8 +169,11 @@ def play_rec(parametros):
         para['tipo'] = tipo[i]
         
         parametros_output_signal_chs.append(para)
+
+    # Defino el thread que envia la señal
+    data_send = np.zeros([steps_frec,chunk_send,output_channels],dtype=np.float32)  # aqui guardo la señal enviada
+    frecs_send = np.zeros([steps_frec,output_channels])   # aqui guardo las frecuencias
           
-    
     def producer(steps_frec, delta_frec):  
         for i in range(steps_frec):
             
@@ -236,7 +235,7 @@ def play_rec(parametros):
     
         consumer_exit[0] = True  
            
-    
+    # Variables de salida de los threads
     producer_exit = [False]   
     consumer_exit = [False] 
             

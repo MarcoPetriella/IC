@@ -104,7 +104,7 @@ def play_rec(parametros):
             delta_frec_hz.append((frec_fin_hz[i]-frec_ini_hz[i])/(steps-1)) # paso del barrido en Hz
             
         
-    duration_sec_acq = duration_sec_send + 0.2 # duracion de la adquisicón de cada paso en segundos
+    duration_sec_acq = duration_sec_send + 0.1 # duracion de la adquisicón de cada paso en segundos
     
     # Inicia pyaudio
     p = pyaudio.PyAudio()
@@ -234,17 +234,17 @@ def play_rec(parametros):
 
 
 #%%
+    
+## Realiza medición y grafica
 parametros = {}
-parametros['fs'] = 44100*8 
-parametros['steps'] = 21 
-parametros['duration_sec_send'] = 0.1 
+parametros['fs'] = 44100 
+parametros['steps'] = 50 
+parametros['duration_sec_send'] = 0.3
 parametros['input_channels'] = 1
-parametros['output_channels'] = 1
-
+parametros['output_channels'] = 2
 parametros['amplitud_ch0'] = 0.1 
 parametros['frec_ini_hz_ch0'] = 500 
 parametros['frec_fin_hz_ch0'] = 500 
-
 parametros['amplitud_ch1'] = 0.1 
 parametros['frec_ini_hz_ch1'] = 500 
 parametros['frec_fin_hz_ch1'] = 5000 
@@ -254,6 +254,86 @@ data_acq, data_send, frecs_send = play_rec(parametros)
 
 plt.plot(np.transpose(data_acq[:,:,0]))
 
+
+#%%
+
+
+### ANALISIS de la señal adquirida. Cheque que la señal adquirida corresponde a la enviada
+
+fs = parametros['fs']
+
+ch_acq = 0
+ch_send = 0
+ind_frec = 2
+
+### Realiza la FFT de la señal enviada y adquirida
+fft_send = abs(fft.fft(data_send[ind_frec,:,ch_send]))/int(data_send.shape[1]/2+1)
+fft_send = fft_send[0:int(data_send.shape[1]/2+1)]
+fft_acq = abs(fft.fft(data_acq[ind_frec,:,ch_acq]))/int(data_acq.shape[1]/2+1)
+fft_acq = fft_acq[0:int(data_acq.shape[1]/2+1)]
+
+frec_send = np.linspace(0,int(data_send.shape[1]/2),int(data_send.shape[1]/2+1))
+frec_send = frec_send*(fs/2+1)/int(data_send.shape[1]/2+1)
+frec_acq = np.linspace(0,int(data_acq.shape[1]/2),int(data_acq.shape[1]/2+1))
+frec_acq = frec_acq*(fs/2+1)/int(data_acq.shape[1]/2+1)
+
+fig = plt.figure(figsize=(14, 7), dpi=250)
+ax = fig.add_axes([.1, .1, .75, .8])
+ax1 = ax.twinx()
+ax.plot(frec_send,fft_send, label='Frec enviada: ' + str(frecs_send[ind_frec,ch_send]) + ' Hz')
+ax1.plot(frec_acq,fft_acq,color='red', label=u'Señal adquirida')
+ax.set_title(u'FFT de la señal enviada y adquirida')
+ax.set_xlabel('Frecuencia [Hz]')
+ax.set_ylabel('Amplitud [a.u.]')
+ax.legend(loc=1)
+ax1.legend(loc=4)
+plt.show()
+
+#%%
+
+## Estudo del retardo en caso que delta_frec = 0
+
+ch_acq = 0
+i_comp = 2
+
+retardos = np.array([])
+for i in range(data_acq.shape[0]):
+    
+    data_acq_i = data_acq[i,:,ch_acq]     
+    corr = np.correlate(data_acq[i_comp,:,ch_acq] - np.mean(data_acq[i_comp,:,ch_acq]),data_acq_i - np.mean(data_acq_i),mode='full')
+    pos_max = np.argmax(corr) - len(data_acq_i)
+    retardos = np.append(retardos,pos_max/fs)
+
+
+    
+fig = plt.figure(figsize=(14, 7), dpi=250)
+ax = fig.add_axes([.15, .15, .8, .8])
+ax.hist(retardos,bins=1000, rwidth =0.99)    
+ax.set_xlabel(u'Retardo')
+ax.set_ylabel('Frecuencia [eventos]')
+ax.set_title(u'Histograma de retardo respecto a la i = ' + str(i_comp) + ' medición')
+ax1.legend(loc=4)
+plt.show()    
+
+
+
+
+#%%
+
+Is = 1.0*1e-12
+Vt = 26.0*1e-3
+n = 1.
+
+Vd = np.linspace(-1,1,1000)
+Id = Is*(np.exp(Vd/n/Vt)-1)
+
+Rs = 100
+Vs = 1
+Ir = Vs/Rs - Vd/Rs
+
+
+plt.plot(Vd,Id)
+plt.plot(Vd,Ir)
 
 ##%%
 ## Parametros
@@ -295,115 +375,3 @@ plt.plot(np.transpose(data_acq[:,:,0]))
 #
 #
 #plt.plot(dd[5,:])
-
-#%%
-
-
-    
-        
-
-
-### ANALISIS de la señal adquirida
-
-# Elijo la frecuencia
-ind_frec = 10
-
-fs = 44100*8 
-### Muestra la serie temporal de las señales enviadas y adquiridas
-t_send = np.linspace(0,np.size(data_send,1)-1,np.size(data_send,1))/fs
-t_adq = np.linspace(0,np.size(data_acq,1)-1,np.size(data_acq,1))/fs
-
-fig = plt.figure(figsize=(14, 7), dpi=250)
-ax = fig.add_axes([.15, .15, .75, .8])
-ax1 = ax.twinx()
-ax.plot(t_send,data_send[ind_frec,:], label=u'Señal enviada: ' + str(frecs_send[ind_frec]) + ' Hz')
-ax1.plot(t_adq,data_acq[ind_frec,:],color='red', label=u'Señal adquirida')
-ax.set_xlabel('Tiempo [seg]')
-ax.set_ylabel('Amplitud [a.u.]')
-ax.legend(loc=1)
-ax1.legend(loc=4)
-plt.show()
-
-### Realiza la FFT de la señal enviada y adquirida
-fft_send = abs(fft.fft(data_send[ind_frec,:]))
-fft_send = fft_send[0:int(chunk_send/2+1)]
-fft_acq = abs(fft.fft(data_acq[ind_frec,:]))
-fft_acq = fft_acq[0:int(chunk_acq/2+1)]
-
-frec_send = np.linspace(0,int(chunk_send/2),int(chunk_send/2+1))
-frec_send = frec_send/duration_sec_send
-frec_acq = np.linspace(0,int(chunk_acq/2),int(chunk_acq/2+1))
-frec_acq = frec_acq/duration_sec_acq
-
-fig = plt.figure(figsize=(14, 7), dpi=250)
-ax = fig.add_axes([.1, .1, .75, .8])
-ax1 = ax.twinx()
-ax.plot(frec_send,fft_send, label='Frec enviada: ' + str(frecs_send[ind_frec]) + ' Hz')
-ax1.plot(frec_acq,fft_acq,color='red', label=u'Señal adquirida')
-ax.set_title(u'FFT de la señal enviada y adquirida')
-ax.set_xlabel('Frecuencia [Hz]')
-ax.set_ylabel('Amplitud [a.u.]')
-ax.legend(loc=1)
-ax1.legend(loc=4)
-plt.show()
-
-#%%
-
-## Estudo del retardo en caso que delta_frec = 0
-
-i_comp = 10
-
-retardos = np.array([])
-for i in range(steps):
-    
-    data_acq_i = data_acq[i,:]     
-    corr = np.correlate(data_acq[i_comp,:] - np.mean(data_acq[i_comp,:]),data_acq_i - np.mean(data_acq_i),mode='full')
-    pos_max = np.argmax(corr) - len(data_acq_i)
-    retardos = np.append(retardos,pos_max/fs)
-
-
-    
-fig = plt.figure(figsize=(14, 7), dpi=250)
-ax = fig.add_axes([.15, .15, .8, .8])
-ax.hist(1000*retardos,bins=1000, rwidth =0.99)    
-ax.set_xlabel(u'Retardo [ms]')
-ax.set_ylabel('Frecuencia [eventos]')
-ax.set_title(u'Histograma de retardo respecto a la i = ' + str(i_comp) + ' medición')
-ax1.legend(loc=4)
-plt.show()    
-
-
-fig = plt.figure(figsize=(14, 7), dpi=250)
-ax = fig.add_axes([.15, .15, .8, .8])
-ax.hist(retardos*frec_ini_hz,bins=100, rwidth =0.99)    
-ax.set_xlabel(u'Retardo relativo [periodo]')
-ax.set_ylabel('Frecuencia [eventos]')
-ax.set_title(u'Histograma de retardo relativo a la duración del período respecto a la i = ' + str(i_comp) + ' medición')
-ax1.legend(loc=4)
-plt.show()    
-
-#%%
-plt.plot(np.transpose(data_acq))
-
-
-plt.plot(np.mean(data_acq[2:,:],axis = 0))
-
-
-
-#%%
-
-Is = 1.0*1e-12
-Vt = 26.0*1e-3
-n = 1.
-
-Vd = np.linspace(-1,1,1000)
-Id = Is*(np.exp(Vd/n/Vt)-1)
-
-Rs = 100
-Vs = 1
-Ir = Vs/Rs - Vd/Rs
-
-
-plt.plot(Vd,Id)
-plt.plot(Vd,Ir)
-

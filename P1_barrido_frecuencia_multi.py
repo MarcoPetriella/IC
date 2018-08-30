@@ -98,13 +98,14 @@ def function_generator(parametros):
 
 def play_rec(parametros):
     
-    # Cargo parametros
+    # Cargo parametros comunes a los dos canales
     fs = parametros['fs']
     duration_sec_send = parametros['duration_sec_send'] 
-    steps = parametros['steps'] 
+    steps_frec = parametros['steps_frec'] 
     input_channels = parametros['input_channels']
     output_channels = parametros['output_channels']
-       
+    
+    # Estos parametros son distintos par cada canal
     frec_ini_hz = []
     frec_fin_hz = []
     amplitud = []
@@ -117,11 +118,11 @@ def play_rec(parametros):
         amplitud.append(parametros['amplitud_ch' + str(i)])
         tipo.append(parametros['tipo_ch' + str(i)])
    
-        if steps == 1: 
+        if steps_frec == 1: 
             delta_frec_hz.append(0.)
             frec_fin_hz[i] = frec_ini_hz[i]
         else:
-            delta_frec_hz.append((frec_fin_hz[i]-frec_ini_hz[i])/(steps-1)) # paso del barrido en Hz
+            delta_frec_hz.append((frec_fin_hz[i]-frec_ini_hz[i])/(steps_frec-1)) # paso del barrido en Hz
             
     # Obligo a la duracion de la adquisicion > a la de salida    
     duration_sec_acq = duration_sec_send + 0.1 # duracion de la adquisicón de cada paso en segundos
@@ -159,8 +160,8 @@ def play_rec(parametros):
     lock1.acquire() # Inicializa el lock, lo pone en cero.
     
     # Defino el thread que envia la señal
-    data_send = np.zeros([steps,chunk_send,output_channels],dtype=np.float32)  # aqui guardo la señal enviada
-    frecs_send = np.zeros([steps,output_channels])   # aqui guardo las frecuencias
+    data_send = np.zeros([steps_frec,chunk_send,output_channels],dtype=np.float32)  # aqui guardo la señal enviada
+    frecs_send = np.zeros([steps_frec,output_channels])   # aqui guardo las frecuencias
     
     # Guardo los parametros de la señal de salida por canal
     parametros_output_signal_chs = []
@@ -174,10 +175,10 @@ def play_rec(parametros):
         parametros_output_signal_chs.append(para)
           
     
-    def producer(steps, delta_frec):  
-        for i in range(steps):
+    def producer(steps_frec, delta_frec):  
+        for i in range(steps_frec):
             
-            # Genero las señales de salida
+            # Genero las señales de salida para los canales
             samples = np.zeros([output_channels,4*chunk_send],dtype = np.float32)
             for j in range(output_channels):
                 
@@ -212,10 +213,10 @@ def play_rec(parametros):
             
             
     # Defino el thread que adquiere la señal        
-    data_acq = np.zeros([steps,chunk_acq,input_channels],dtype=np.int16)  # aqui guardo la señal adquirida
+    data_acq = np.zeros([steps_frec,chunk_acq,input_channels],dtype=np.int16)  # aqui guardo la señal adquirida
     
-    def consumer():
-        for i in range(steps):
+    def consumer(steps_frec):
+        for i in range(steps_frec):
             
             # Toma el lock, adquiere la señal y la guarda en el array
             lock1.acquire()
@@ -240,8 +241,8 @@ def play_rec(parametros):
     consumer_exit = [False] 
             
     # Inicio los threads    
-    t1 = threading.Thread(target=producer, args=[steps,delta_frec_hz])
-    t2 = threading.Thread(target=consumer, args=[])
+    t1 = threading.Thread(target=producer, args=[steps_frec,delta_frec_hz])
+    t2 = threading.Thread(target=consumer, args=[steps_frec])
     t1.start()
     t2.start()
     
@@ -265,9 +266,9 @@ def play_rec(parametros):
 ## Realiza medición y grafica
 parametros = {}
 parametros['fs'] = 44100 
-parametros['steps'] = 50 
+parametros['steps_frec'] = 50 
 parametros['duration_sec_send'] = 0.3
-parametros['input_channels'] = 1
+parametros['input_channels'] = 2
 parametros['output_channels'] = 2
 parametros['tipo_ch0'] = 'sin' 
 parametros['amplitud_ch0'] = 0.1 
@@ -280,13 +281,11 @@ parametros['frec_fin_hz_ch1'] = 500
 
 data_acq, data_send, frecs_send = play_rec(parametros)
 
-
-plt.plot(np.transpose(data_acq[:,:,0]))
+#%%
+plt.plot(np.transpose(data_acq[:,:,1]))
 
 
 #%%
-
-
 ### ANALISIS de la señal adquirida. Cheque que la señal adquirida corresponde a la enviada
 
 fs = parametros['fs']
@@ -320,10 +319,10 @@ plt.show()
 
 #%%
 
-## Estudo del retardo en caso que delta_frec = 0
+### Estudo del retardo en caso que delta_frec = 0
 
 ch_acq = 0
-i_comp = 2
+i_comp = 5
 
 retardos = np.array([])
 for i in range(data_acq.shape[0]):
@@ -331,7 +330,7 @@ for i in range(data_acq.shape[0]):
     data_acq_i = data_acq[i,:,ch_acq]     
     corr = np.correlate(data_acq[i_comp,:,ch_acq] - np.mean(data_acq[i_comp,:,ch_acq]),data_acq_i - np.mean(data_acq_i),mode='full')
     pos_max = np.argmax(corr) - len(data_acq_i)
-    retardos = np.append(retardos,pos_max/fs)
+    retardos = np.append(retardos,pos_max)
 
 
     

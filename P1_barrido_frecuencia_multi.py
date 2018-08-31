@@ -373,15 +373,18 @@ parametros['data_acq']  = data_acq
 data_acq_corrected, retardos = sincroniza_con_trigger(parametros)
 
 
-ch = 1
+ch = 0
+ind = 5
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.1, .1, .75, .8])
 ax1 = ax.twinx()
-ax.plot(np.transpose(data_acq_corrected[:,:,ch]),color='r')
-ax1.plot(np.transpose(data_send[:,:,ch]),color='b')
+ax.plot(np.transpose(data_acq_corrected[ind,:,ch]),color='r', label='señal adquirida')
+ax1.plot(np.transpose(data_send[ind,:,ch]),color='b', label='señal enviada')
 
-
+ax.legend(loc=1)
+ax1.legend(loc=4)
+plt.show()
 
 
 #%%

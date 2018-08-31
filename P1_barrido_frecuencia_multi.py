@@ -6,56 +6,6 @@ Created on Fri Aug 24 12:36:24 2018
 """
 
 
-"""
-Descripción:
-------------
-Este script realiza un barrido en frecuencias utilizando la salida y entrada de audio como emisor-receptor.
-Utiliza la libreria pyaudio para generar las señales de salida y la entrada de adquisición.
-El script lanza dos thread o hilos que se ejecutan contemporaneamente: 
-uno para la generación de la señal (producer) y otro para la adquisicón (consumer).
-El script está programado para que el hilo productor envie una señal y habilite en ese momento la adquisición del hilo consumidor.
-Se utilizan dos semaforos para la interección entre threads: 
-    - semaphore1: señala el comienzo de cada paso del barrido de frecuencias, y avisa al consumidor que puede comenzar la adquisición.
-    - semaphore2: señala que el hilo consumidor ya ha adquirido la señal y por lo tanto se puede comenzar la adquisición del siguiente paso del barrido.
-La señal enviada se guarda en el array data_send, donde cada fila indica un paso del barrido 
-La señal adquirida se guarda en el array data_acq, donde cada fila indica un paso del barrido 
-
-Al final del script se agregan dos secciones para verificar el correcto funcionamiento del script y para medir el retardo
-entre mediciones iguales (en este caso es necesario que delta_frec_hz = 0). En mi pc de escritorio el retardo entre señales medidas está dentro
-de +/- 3 ms, que puede considerarse como la variabilidad del retardo entre el envío de la señal y la adquisición.
-
-Algunas dudas:
---------------
-    - El buffer donde se lee la adquisición guarda datos de la adquisicón correspondiente al paso anterior. Para evitar esto se borran 
-    los primeros datos del buffer, pero no es muy profesional. La cantidad de datos agregados parece ser independiente del tiempo de adquisición
-    o la duración de la señal enviada.
-    - La señal digital que se envia debe ser cuatro veces mas larga que la que se envía analógicamente. No entiendo porqué.
-    - Se puede mejorar la variabilidad en el retardo entre señal enviada y adquirida? Es decir se puede mejorar la sincronización entre los dos procesos?
-
-Falta:
-------
-    - Mejorar la interrupción del script por el usuario. Por el momento termina únicamente cuando termina la corrida.
-
-Notas:
---------
-- Cambio semaforo por lock. Mejora la sincronización en +/- 1 ms. 
-- Define un chunk_acq_eff que tiene en cuenta el delay inicial
-- Cambiar Event por Lock no cambia mucho
-- Cuando duration_sec_send > duration_sec_adq la variabilidad del retardo entre los procesos es aprox +/- 1 ms, salvo para la primera medición
-- Cuando duration_sec_send < duration_sec_adq la variabilidad del retardo es muchas veces nula, salvo para la primera medición
-- Obligo a que la duración de adquisición  > duración de la señal enviada para mejorar la sincronización.
-
-
-Parametros:
------------
-fs = 44100*8 # frecuencia de sampleo en Hz
-frec_ini_hz = 10 # frecuencia inicial de barrido en Hz
-frec_fin_hz = 40000 # frecuencia inicial de barrido en Hz
-steps = 50 # cantidad de pasos del barrido
-duration_sec_send = 0.3 # duracion de la señal de salida de cada paso en segundos
-A = 0.1 # Amplitud de la señal de salida
-
-"""
 
 #%%
 import pyaudio
@@ -80,6 +30,26 @@ pylab.rcParams.update(params)
 
 def function_generator(parametros):
     
+    """
+    Esta función genera señales de tipo seno, cuadrada y rampa.
+    
+    Parametros:
+    -----------
+    Para el ingreso de los parametros de adquisición se utiliza un diccionario.
+
+    fs : int, frecuencia de sampleo de la placa de audio. Valor máximo 44100*8 Hz. [Hz] 
+    frec : float, frecuencia de la señal. [Hz] 
+    amplitud : float, amplitud de la señal.
+    duracion : float, tiempo de duración de la señal. [seg]
+    tipo : {'square', 'sin', 'ramp'}, tipo de señal.   
+    
+    Salida (returns):
+    -----------------
+    output_signal : numpy array, señal de salida.
+    
+    Autores: Leslie Cusato, Marco Petriella
+    """
+
     fs = parametros['fs']
     frec = parametros['frec']
     amplitud = parametros['amplitud']
@@ -97,6 +67,74 @@ def function_generator(parametros):
 
 
 def play_rec(parametros):
+    
+    
+    """
+    Descripción:
+    ------------
+    Esta función permite utilizar la placa de audio de la pc como un generador de funciones / osciloscopio
+    con dos canales de entrada y dos de salida. Para ello utiliza la libreria pyaudio y las opciones de write() y read()
+    para escribir y leer los buffer de escritura y lectura. Para realizar el envio y adquisición simultánea de señales, utiliza
+    un esquema de tipo productor-consumidor que se ejecutan en thread o hilos diferenntes. Para realizar la comunicación 
+    entre threads y evitar overrun o sobreescritura de los datos del buffer de lectura se utilizan dos variables de tipo block.
+    El block1 se activa desde proceso productor y avisa al consumidor que el envio de la señal ha comenzado y que por lo tanto 
+    puede iniciar la adquisición. 
+    El block2 se activa desde el proceso consumidor y aviso al productor que la lesctura de los datos ha finalizado y por lo tanto
+    puede comenzar un nuevo paso del barrido. 
+    Teniendo en cuenta que existe un retardo entre la señal enviada y adquirida, y que existe variabilidad en el retardo; se puede
+    utilizar el canal 0 de entrada y salida para el envio y adquisicón de una señal de disparo que permita sincronizar las mediciones.
+    
+    Parámetros:
+    -----------
+    Para el ingreso de los parametros de adquisición se utiliza un diccionario.
+    
+    parametros = {}
+    parametros['fs'] : int, frecuencia de sampleo de la placa de audio. Valor máximo 44100*8 Hz. [Hz]
+    parametros['steps_frec'] : int, cantidad de pasos del barrido de frecuencias.
+    parametros['duration_sec_send'] : float, tiempo de duración de la adquisición. [seg]
+    parametros['input_channels'] : int, cantidad de canales de entrada.
+    parametros['output_channels'] : int, cantidad de canales de salida.
+    parametros['tipo_ch0'] : {'square', 'sin', 'ramp'}, tipo de señal enviada en el canal 0.
+    parametros['amplitud_ch0'] : float, amplitud de la señal del canal 0. [V]. Máximo valor 1 V.
+    parametros['frec_ini_hz_ch0'] : float, frecuencia inicial del barrido del canal 0. [Hz] 
+    parametros['frec_fin_hz_ch0'] : float, frecuencia final del barrido del canal 0. [Hz] 
+    parametros['tipo_ch1'] : {'square', 'sin', 'ramp'}, tipo de señal enviada en el canal 1.
+    parametros['amplitud_ch1'] : float, amplitud de la señal del canal 1. [V]. Máximo valor 1 V.
+    parametros['frec_ini_hz_ch1'] : float, frecuencia inicial del barrido del canal 1. [Hz] 
+    parametros['frec_fin_hz_ch1'] : float, frecuencia final del barrido del canal 1. [Hz] 
+    
+    Salida (returns):
+    -----------------
+    data_acq: numpy array, array de tamaño [steps_frec][muestras_por_pasos_input][input_channels]
+    data_send: numpy array, array de tamaño [steps_frec][muestras_por_pasos_output][output_channels]
+    frecs_send: numpy array, array de tamaño [steps_frec][output_channels]
+    
+    Las muestras por pasos está determinada por los tiempos de duración de la señal enviada y adquirida. El tiempo entre 
+    muestras es 1/fs
+    
+    Ejemplo:
+    --------
+    
+    parametros = {}
+    parametros['fs'] = 44100 
+    parametros['steps_frec'] = 10 
+    parametros['duration_sec_send'] = 0.3
+    parametros['input_channels'] = 2
+    parametros['output_channels'] = 2
+    parametros['tipo_ch0'] = 'square' 
+    parametros['amplitud_ch0'] = 0.1 
+    parametros['frec_ini_hz_ch0'] = 500 
+    parametros['frec_fin_hz_ch0'] = 500 
+    parametros['tipo_ch1'] = 'ramp' 
+    parametros['amplitud_ch1'] = 0.1 
+    parametros['frec_ini_hz_ch1'] = 500 
+    parametros['frec_fin_hz_ch1'] = 5000
+    
+    data_acq, data_send, frecs_send = play_rec(parametros)    
+    
+    
+    Autores: Leslie Cusato, Marco Petriella    
+    """    
     
     # Cargo parametros comunes a los dos canales
     fs = parametros['fs']
@@ -125,7 +163,7 @@ def play_rec(parametros):
             delta_frec_hz.append((frec_fin_hz[i]-frec_ini_hz[i])/(steps_frec-1)) # paso del barrido en Hz
             
     # Obligo a la duracion de la adquisicion > a la de salida    
-    duration_sec_acq = duration_sec_send + 0.1 # duracion de la adquisicón de cada paso en segundos
+    duration_sec_acq = duration_sec_send + 0.1 
     
     # Inicia pyaudio
     p = pyaudio.PyAudio()
@@ -185,11 +223,7 @@ def play_rec(parametros):
                                        
                 parametros_output_signal = parametros_output_signal_chs[j]
                 parametros_output_signal['frec'] = f
-                samples[j,0:chunk_send] = function_generator(parametros_output_signal)
-#                if j == 1:
-#                    a = function_generator(parametros_output_signal)
-#                    a[a>0] = a[a>0]*2
-#                    samples[j,0:chunk_send] = a
+                samples[j,0:chunk_send] = function_generator(parametros_output_signal)                    
                 
                 # Guardo las señales de salida
                 data_send[i,:,j] = samples[j,0:chunk_send]
@@ -264,21 +298,44 @@ def play_rec(parametros):
 
 def sincroniza_con_trigger(parametros):
     
+    """
+    Esta función corrige el retardo de las mediciones adquiridas con la función play_rec. Para ello utiliza la señal de 
+    trigger enviada y adquirida en el canal 0 de la placa de audio, y sincroniza las mediciones de todos los canales de entrada. 
+    El retardo se determina a partir de realizar la correlación cruzada entre la señal enviada y adquirida, y encontrando la posición
+    del máximo del resultado.
+    
+    
+    Parámetros:
+    -----------
+    data_send : numpy array, de tamaño [steps_frec][muestras_por_pasos_output][output_channels]
+    data_acq : numpy array, array de tamaño [steps_frec][muestras_por_pasos_input][input_channels]
+    
+    Salida (returns):
+    -----------------
+    data_acq_corrected : numpy array, señal de salida con retardo corregido de tamaño [steps_frec][muestras_por_pasos_input][input_channels]. 
+                         El tamaño de la segunda dimensión es la misma que la de data_send.
+    retardos : numpy array, array con los retardos de tamaño [steps_frec].
+    
+    Autores: Leslie Cusato, Marco Petriella   
+    """
+    
     data_send = parametros['data_send']
     data_acq = parametros['data_acq']   
     trigger_send = data_send[:,:,0]
     trigger_acq = data_acq[:,:,0]
+    
+    extra = 0
         
-    data_acq_corrected = np.zeros([trigger_send.shape[0],trigger_send.shape[1],2])
+    data_acq_corrected = np.zeros([trigger_send.shape[0],trigger_send.shape[1]+extra,data_acq.shape[2]])
     retardos = np.array([])
     for i in range(data_acq.shape[0]):
             
         corr = np.correlate(trigger_send[i,:] - np.mean(trigger_send[i,:]),trigger_acq[i,:] - np.mean(trigger_acq[i,:]),mode='full')
         pos_max = trigger_acq.shape[1] - np.argmax(corr)
         retardos = np.append(retardos,pos_max)
-            
-        data_acq_corrected[i,:,0] = data_acq[i,pos_max:pos_max+trigger_send.shape[1],0]
-        data_acq_corrected[i,:,1] = data_acq[i,pos_max:pos_max+trigger_send.shape[1],1]
+        
+        for j in range(trigger_acq.shape[2]):
+            data_acq_corrected[i,:,j] = data_acq[i,pos_max:pos_max+trigger_send.shape[1]+extra,j]
         
         
     return data_acq_corrected, retardos
@@ -292,7 +349,7 @@ parametros['steps_frec'] = 10
 parametros['duration_sec_send'] = 0.3
 parametros['input_channels'] = 2
 parametros['output_channels'] = 2
-parametros['tipo_ch0'] = 'sin' 
+parametros['tipo_ch0'] = 'square' 
 parametros['amplitud_ch0'] = 0.1 
 parametros['frec_ini_hz_ch0'] = 500 
 parametros['frec_fin_hz_ch0'] = 500 
@@ -305,14 +362,10 @@ data_acq, data_send, frecs_send = play_rec(parametros)
 
 
 
-#%%
-plt.plot(np.transpose(data_acq[:,:,1]))
-
-plt.plot(np.transpose(data_send[:,:,1]))
-
-
 
 #%%
+
+## Corrige retardo y grafica
 parametros = {}
 parametros['data_send'] = data_send
 parametros['data_acq']  = data_acq
@@ -320,24 +373,12 @@ parametros['data_acq']  = data_acq
 data_acq_corrected, retardos = sincroniza_con_trigger(parametros)
 
 
+fig = plt.figure(figsize=(14, 7), dpi=250)
+ax = fig.add_axes([.1, .1, .75, .8])
+ax1 = ax.twinx()
+ax.plot(np.transpose(data_acq_corrected[:,:,0]),color='r')
+ax1.plot(np.transpose(data_send[:,:,0]),color='b')
 
-#trigger_send = data_send[:,:,0]
-#trigger_acq = data_acq[:,:,0]
-#    
-#data_acq_corrected = np.zeros([trigger_send.shape[0],trigger_send.shape[1],2])
-#retardos = np.array([])
-#for i in range(data_acq.shape[0]):
-#        
-#    corr = np.correlate(trigger_send[i,:] - np.mean(trigger_send[i,:]),trigger_acq[i,:] - np.mean(trigger_acq[i,:]),mode='full')
-#    pos_max = trigger_acq.shape[1] - np.argmax(corr)
-#    retardos = np.append(retardos,pos_max)
-#        
-#    data_acq_corrected[i,:,0] = data_acq[i,pos_max:pos_max+trigger_send.shape[1],0]
-#    data_acq_corrected[i,:,1] = data_acq[i,pos_max:pos_max+trigger_send.shape[1],1]
-#
-#
-#
-#plt.plot(corr)
 
 
 

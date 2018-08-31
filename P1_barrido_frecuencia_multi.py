@@ -109,8 +109,8 @@ def play_rec(parametros):
     data_send: numpy array, array de tamaño [steps_frec][muestras_por_pasos_output][output_channels]
     frecs_send: numpy array, array de tamaño [steps_frec][output_channels]
     
-    Las muestras por pasos está determinada por los tiempos de duración de la señal enviada y adquirida. El tiempo entre 
-    muestras es 1/fs
+    Las muestras_por_pasos está determinada por los tiempos de duración de la señal enviada y adquirida. El tiempo entre 
+    muestras es 1/fs.
     
     Ejemplo:
     --------
@@ -383,6 +383,11 @@ ax1.plot(np.transpose(data_send[ind,:,ch]),color='b', label='señal enviada')
 ax.legend(loc=1)
 ax1.legend(loc=4)
 plt.show()
+
+
+fig = plt.figure(figsize=(14, 7), dpi=250)
+ax = fig.add_axes([.1, .1, .75, .8])
+ax.hist(retardos, bins=100)
 
 
 #%%

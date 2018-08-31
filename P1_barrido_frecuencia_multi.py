@@ -334,7 +334,7 @@ def sincroniza_con_trigger(parametros):
         pos_max = trigger_acq.shape[1] - np.argmax(corr)
         retardos = np.append(retardos,pos_max)
         
-        for j in range(trigger_acq.shape[2]):
+        for j in range(data_acq.shape[2]):
             data_acq_corrected[i,:,j] = data_acq[i,pos_max:pos_max+trigger_send.shape[1]+extra,j]
         
         
@@ -356,7 +356,7 @@ parametros['frec_fin_hz_ch0'] = 500
 parametros['tipo_ch1'] = 'ramp' 
 parametros['amplitud_ch1'] = 0.1 
 parametros['frec_ini_hz_ch1'] = 500 
-parametros['frec_fin_hz_ch1'] = 500 
+parametros['frec_fin_hz_ch1'] = 5000
 
 data_acq, data_send, frecs_send = play_rec(parametros)
 
@@ -373,11 +373,13 @@ parametros['data_acq']  = data_acq
 data_acq_corrected, retardos = sincroniza_con_trigger(parametros)
 
 
+ch = 1
+
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.1, .1, .75, .8])
 ax1 = ax.twinx()
-ax.plot(np.transpose(data_acq_corrected[:,:,0]),color='r')
-ax1.plot(np.transpose(data_send[:,:,0]),color='b')
+ax.plot(np.transpose(data_acq_corrected[:,:,ch]),color='r')
+ax1.plot(np.transpose(data_send[:,:,ch]),color='b')
 
 
 

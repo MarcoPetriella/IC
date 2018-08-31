@@ -41,7 +41,7 @@ def function_generator(parametros):
     frec : float, frecuencia de la señal. [Hz] 
     amplitud : float, amplitud de la señal.
     duracion : float, tiempo de duración de la señal. [seg]
-    tipo : {'square', 'sin', 'ramp'}, tipo de señal.   
+    tipo : {'square', 'sin', 'ramp', 'constant'}, tipo de señal.   
     
     Salida (returns):
     -----------------
@@ -62,6 +62,8 @@ def function_generator(parametros):
         output_signal = amplitud*signal.square(2*np.pi*np.arange(int(duracion*fs))*frec/fs, duty=0.5).astype(np.float32) 
     elif tipo is 'ramp':
         output_signal = amplitud*signal.sawtooth(2*np.pi*np.arange(int(duracion*fs))*frec/fs, width=0.5).astype(np.float32) 
+    elif tipo is 'constant':
+        output_signal = amplitud*(int(duracion*fs)).astype(np.float32) 
 
     return output_signal
 
@@ -83,6 +85,7 @@ def play_rec(parametros):
     puede comenzar un nuevo paso del barrido. 
     Teniendo en cuenta que existe un retardo entre la señal enviada y adquirida, y que existe variabilidad en el retardo; se puede
     utilizar el canal 0 de entrada y salida para el envio y adquisicón de una señal de disparo que permita sincronizar las mediciones.
+    Notar que cuando se pone output_channel = 1, en la segunda salida pone la misma señal que en el channel 1 de salida.
     
     Parámetros:
     -----------
@@ -94,7 +97,7 @@ def play_rec(parametros):
     parametros['duration_sec_send'] : float, tiempo de duración de la adquisición. [seg]
     parametros['input_channels'] : int, cantidad de canales de entrada.
     parametros['output_channels'] : int, cantidad de canales de salida.
-    parametros['tipo_ch0'] : {'square', 'sin', 'ramp'}, tipo de señal enviada en el canal 0.
+    parametros['tipo_ch0'] : {'square', 'sin', 'ramp', 'constant'}, tipo de señal enviada en el canal 0.
     parametros['amplitud_ch0'] : float, amplitud de la señal del canal 0. [V]. Máximo valor 1 V.
     parametros['frec_ini_hz_ch0'] : float, frecuencia inicial del barrido del canal 0. [Hz] 
     parametros['frec_fin_hz_ch0'] : float, frecuencia final del barrido del canal 0. [Hz] 
@@ -351,7 +354,7 @@ parametros['tipo_ch0'] = 'square'
 parametros['amplitud_ch0'] = 0.1 
 parametros['frec_ini_hz_ch0'] = 500 
 parametros['frec_fin_hz_ch0'] = 500 
-parametros['tipo_ch1'] = 'ramp' 
+parametros['tipo_ch1'] = 'sin' 
 parametros['amplitud_ch1'] = 0.1 
 parametros['frec_ini_hz_ch1'] = 500 
 parametros['frec_fin_hz_ch1'] = 5000
@@ -364,22 +367,21 @@ data_acq, data_send, frecs_send = play_rec(parametros)
 #%%
 
 ## Corrige retardo y grafica
-parametros = {}
-parametros['data_send'] = data_send
-parametros['data_acq']  = data_acq
+parametros_retardo = {}
+parametros_retardo['data_send'] = data_send
+parametros_retardo['data_acq']  = data_acq
 
-data_acq_corrected, retardos = sincroniza_con_trigger(parametros)
+data_acq_corrected, retardos = sincroniza_con_trigger(parametros_retardo)
 
 
-ch = 0
+ch = 1
 ind = 5
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
-ax = fig.add_axes([.1, .1, .75, .8])
+ax = fig.add_axes([.12, .12, .75, .8])
 ax1 = ax.twinx()
 ax.plot(np.transpose(data_acq_corrected[ind,:,ch]),color='r', label='señal adquirida')
 ax1.plot(np.transpose(data_send[ind,:,ch]),color='b', label='señal enviada')
-
 ax.legend(loc=1)
 ax1.legend(loc=4)
 plt.show()
@@ -388,6 +390,9 @@ plt.show()
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.1, .1, .75, .8])
 ax.hist(retardos, bins=100)
+ax.set_title(u'Retardos')
+ax.set_xlabel('Retardos')
+ax.set_ylabel('Frecuencia')
 
 
 #%%
@@ -395,23 +400,23 @@ ax.hist(retardos, bins=100)
 
 fs = parametros['fs']
 
-ch_acq = 0
-ch_send = 0
-ind_frec = 2
+ch_acq = 1
+ch_send = 1
+ind_frec = 5
 
 ### Realiza la FFT de la señal enviada y adquirida
 fft_send = abs(fft.fft(data_send[ind_frec,:,ch_send]))/int(data_send.shape[1]/2+1)
 fft_send = fft_send[0:int(data_send.shape[1]/2+1)]
-fft_acq = abs(fft.fft(data_acq[ind_frec,:,ch_acq]))/int(data_acq.shape[1]/2+1)
-fft_acq = fft_acq[0:int(data_acq.shape[1]/2+1)]
+fft_acq = abs(fft.fft(data_acq_corrected[ind_frec,:,ch_acq]))/int(data_acq_corrected.shape[1]/2+1)
+fft_acq = fft_acq[0:int(data_acq_corrected.shape[1]/2+1)]
 
 frec_send = np.linspace(0,int(data_send.shape[1]/2),int(data_send.shape[1]/2+1))
 frec_send = frec_send*(fs/2+1)/int(data_send.shape[1]/2+1)
-frec_acq = np.linspace(0,int(data_acq.shape[1]/2),int(data_acq.shape[1]/2+1))
-frec_acq = frec_acq*(fs/2+1)/int(data_acq.shape[1]/2+1)
+frec_acq = np.linspace(0,int(data_acq_corrected.shape[1]/2),int(data_acq_corrected.shape[1]/2+1))
+frec_acq = frec_acq*(fs/2+1)/int(data_acq_corrected.shape[1]/2+1)
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
-ax = fig.add_axes([.1, .1, .75, .8])
+ax = fig.add_axes([.12, .12, .75, .8])
 ax1 = ax.twinx()
 ax.plot(frec_send,fft_send, label='Frec enviada: ' + str(frecs_send[ind_frec,ch_send]) + ' Hz')
 ax1.plot(frec_acq,fft_acq,color='red', label=u'Señal adquirida')
@@ -422,34 +427,7 @@ ax.legend(loc=1)
 ax1.legend(loc=4)
 plt.show()
 
-#%%
-
-### Estudo del retardo en caso que delta_frec = 0
-
-ch_acq = 0
-i_comp = 5
-
-retardos = np.array([])
-for i in range(data_acq.shape[0]):
-    
-    data_acq_i = data_acq[i,:,ch_acq]     
-    corr = np.correlate(data_acq[i_comp,:,ch_acq] - np.mean(data_acq[i_comp,:,ch_acq]),data_acq_i - np.mean(data_acq_i),mode='full')
-    pos_max = np.argmax(corr) - len(data_acq_i)
-    retardos = np.append(retardos,pos_max)
-
-
-    
-fig = plt.figure(figsize=(14, 7), dpi=250)
-ax = fig.add_axes([.15, .15, .8, .8])
-ax.hist(retardos,bins=1000, rwidth =0.99)    
-ax.set_xlabel(u'Retardo')
-ax.set_ylabel('Frecuencia [eventos]')
-ax.set_title(u'Histograma de retardo respecto a la i = ' + str(i_comp) + ' medición')
-ax1.legend(loc=4)
-plt.show()    
-
-
-
+ 
 
 #%%
 
@@ -468,43 +446,3 @@ Ir = Vs/Rs - Vd/Rs
 plt.plot(Vd,Id)
 plt.plot(Vd,Ir)
 
-##%%
-## Parametros
-#parametros = {}
-#parametros['fs'] = 44100*8 
-#parametros['frec_ini_hz'] = 500 
-#parametros['frec_fin_hz'] = 500 
-#parametros['steps'] = 21 
-#parametros['amplitud'] = 0.1 
-#
-#frec_inis = [0,100,1000,15000]
-#frec_fins = [100,1000,15000,19000]
-#duraciones = [2,1,0.5,0.5]
-#
-#carpeta_resultdos = 'respuesta_emisor_receptor'
-#os.mkdir(carpeta_resultdos)
-#
-#
-#for i in range(4):
-#    
-#    parametros['frec_ini_hz'] = frec_inis[i]
-#    parametros['frec_fin_hz'] = frec_fins[i]
-#    parametros['duration_sec_send'] = duraciones[i] 
-#
-#
-#    data_acq, data_send, frecs_send = play_rec(parametros)
-#    
-#    np.save(os.path.join(carpeta_resultdos, 'data_acq_rango_'+str(i)),data_acq)
-#    np.save(os.path.join(carpeta_resultdos, 'data_send_rango_'+str(i)),data_send)
-#    np.save(os.path.join(carpeta_resultdos, 'frecs_send_rango_'+str(i)),frecs_send)
-#    np.save(os.path.join(carpeta_resultdos, 'parametros_rango_'+str(i)),parametros)
-#
-#
-#i = 0
-#dd = np.load(os.path.join(carpeta_resultdos, 'data_acq_rango_' + str(i) + '.npy'))  
-#params = np.load(os.path.join(carpeta_resultdos, 'parametros_rango_' + str(i) + '.npy'))
-#
-#plt.plot(np.transpose(dd))
-#
-#
-#plt.plot(dd[5,:])

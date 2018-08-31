@@ -286,9 +286,7 @@ def play_rec(parametros):
          
     while(not producer_exit[0] or not consumer_exit[0]):
         time.sleep(0.2)
-    
-    
-        
+         
     stream_input.close()
     stream_output.close()
     p.terminate()   

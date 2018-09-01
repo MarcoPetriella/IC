@@ -450,13 +450,13 @@ ind_amplitud = 0
 ### Realiza la FFT de la señal enviada y adquirida
 fft_send = abs(fft.fft(data_send[ind_frec,ind_amplitud,:,ch_send]))/int(data_send.shape[2]/2+1)
 fft_send = fft_send[0:int(data_send.shape[2]/2+1)]
-fft_acq = abs(fft.fft(data_acq_corrected[ind_frec,ind_amplitud,:,ch_acq]))/int(data_acq_corrected.shape[2]/2+1)
-fft_acq = fft_acq[0:int(data_acq_corrected.shape[2]/2+1)]
+fft_acq = abs(fft.fft(data_acq[ind_frec,ind_amplitud,:,ch_acq]))/int(data_acq.shape[2]/2+1)
+fft_acq = fft_acq[0:int(data_acq.shape[2]/2+1)]
 
 frec_send = np.linspace(0,int(data_send.shape[2]/2),int(data_send.shape[2]/2+1))
 frec_send = frec_send*(fs/2+1)/int(data_send.shape[2]/2+1)
-frec_acq = np.linspace(0,int(data_acq_corrected.shape[2]/2),int(data_acq_corrected.shape[2]/2+1))
-frec_acq = frec_acq*(fs/2+1)/int(data_acq_corrected.shape[2]/2+1)
+frec_acq = np.linspace(0,int(data_acq.shape[2]/2),int(data_acq.shape[2]/2+1))
+frec_acq = frec_acq*(fs/2+1)/int(data_acq.shape[2]/2+1)
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.12, .12, .75, .8])

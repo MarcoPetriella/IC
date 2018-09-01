@@ -149,7 +149,7 @@ def play_rec(parametros):
     steps_amplitud = parametros['steps_amplitud'] 
     input_channels = parametros['input_channels']
     output_channels = parametros['output_channels']
-    corrige_retardo = parametros['corrige_retardo']
+    corrige_retardos = parametros['corrige_retardos']
     
     # Estos parametros son distintos par cada canal
     frec_ini_hz = []
@@ -266,15 +266,9 @@ def play_rec(parametros):
         producer_exit[0] = True  
             
             
-    # Donde se guardan los resultados             
-    if corrige_retardo is 'si':    
-        data_acq = np.zeros([steps_frec,steps_amplitud,chunk_send,input_channels],dtype=np.int16)  
-    else:          
-        data_acq = np.zeros([steps_frec,steps_amplitud,chunk_acq,input_channels],dtype=np.int16)  # aqui guardo la señal adquirida
+    # Donde se guardan los resultados                     
+    data_acq = np.zeros([steps_frec,steps_amplitud,chunk_acq,input_channels],dtype=np.int16)  
         
-    # Guardo los retardos    
-    retardos = np.zeros(steps_frec*steps_amplitud)
-    
     # Defino el thread que adquiere la señal   
     def consumer(steps_frec,steps_amplitud):
         cont = 0
@@ -290,25 +284,15 @@ def play_rec(parametros):
                 data_i = stream_input.read(chunk_acq)  
                 stream_input.stop_stream()   
                 
-                data_i = -np.frombuffer(data_i, dtype=np.int16)
-                               
-                # Corrige retardo por correlacion
-                pos_max = 0
-                size_acq = chunk_acq
-                if corrige_retardo is 'si':
-                    corr = np.correlate(data_send[i,k,:,0] - np.mean(data_send[i,k,:,0]),data_i[0::input_channels] - np.mean(data_i[0::input_channels]),mode='full')
-                    pos_max = chunk_acq - np.argmax(corr) - 1
-                    size_acq = chunk_send
-                    retardos[cont-1] = pos_max
+                data_i = -np.frombuffer(data_i, dtype=np.int16)                            
                 
                 # Guarda la salida                   
                 for j in range(input_channels):
-                    data_acq[i,k,:,j] = data_i[j+pos_max*input_channels:(pos_max+size_acq)*input_channels:input_channels]                   
+                    data_acq[i,k,:,j] = data_i[j::input_channels]                   
                     
                 # Barra de progreso
                 stdout.write("\r[%s]" % ('Progreso barrido: ' + str(int(100*cont/steps_frec/steps_amplitud)) + ' %'))
-                
-                
+                                
                 lock2.release() # Avisa al productor que terminó de escribir los datos y puede comenzar con el próximo step
     
         consumer_exit[0] = True  
@@ -322,14 +306,20 @@ def play_rec(parametros):
     t2 = threading.Thread(target=consumer, args=[steps_frec,steps_amplitud])
     t1.start()
     t2.start()
-    
-         
+             
     while(not producer_exit[0] or not consumer_exit[0]):
         time.sleep(0.2)
          
     stream_input.close()
     stream_output.close()
     p.terminate()   
+    
+    retardos = np.array([])
+    if corrige_retardos is 'si':
+        parametros_retardo = {}
+        parametros_retardo['data_send'] = data_send
+        parametros_retardo['data_acq']  = data_acq        
+        data_acq, retardos = sincroniza_con_trigger(parametros_retardo)       
     
     return data_acq, data_send, frecs_send, amplitudes_send, retardos
  
@@ -391,21 +381,24 @@ def sincroniza_con_trigger(parametros):
 parametros = {}
 parametros['fs'] = 44100 
 parametros['steps_frec'] = 10 
-parametros['steps_amplitud'] = 15 
+parametros['steps_amplitud'] = 10 
 parametros['duration_sec_send'] = 0.3
 parametros['input_channels'] = 2
 parametros['output_channels'] = 2
+
 parametros['tipo_ch0'] = 'square' 
 parametros['amplitud_ini_ch0'] = 0.1 
 parametros['amplitud_fin_ch0'] = 0.1 
 parametros['frec_ini_hz_ch0'] = 500 
 parametros['frec_fin_hz_ch0'] = 500 
-parametros['tipo_ch1'] = 'ramp' 
+
+parametros['tipo_ch1'] = 'sin' 
 parametros['amplitud_ini_ch1'] = 0.01 
 parametros['amplitud_fin_ch1'] = 0.1 
 parametros['frec_ini_hz_ch1'] = 500 
 parametros['frec_fin_hz_ch1'] = 5000
-parametros['corrige_retardo'] = 'si'
+
+parametros['corrige_retardos'] = 'si'
 
 data_acq, data_send, frecs_send, amplitudes_send, retardos = play_rec(parametros)
 
@@ -419,12 +412,12 @@ parametros_retardo = {}
 parametros_retardo['data_send'] = data_send
 parametros_retardo['data_acq']  = data_acq
 
-data_acq_corrected, retardos = sincroniza_con_trigger(parametros_retardo)
+data_acq, retardos = sincroniza_con_trigger(parametros_retardo)
 
 #%%
-ch = 1
-ind_frec = 5
-ind_amplitud = 0
+ch = 0
+ind_frec = 9
+ind_amplitud = 3
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.12, .12, .75, .8])

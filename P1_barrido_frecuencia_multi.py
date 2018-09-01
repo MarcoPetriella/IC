@@ -31,6 +31,32 @@ params = {'legend.fontsize': 'medium',
 pylab.rcParams.update(params)
 
 
+def barra_progreso(paso,pasos_totales,leyenda,tiempo_ini):
+
+    """
+    Esta función genera una barra de progreso
+    
+    Parametros:
+    -----------
+    paso : int, paso actual
+    pasos_totales : int, cantidad de pasos totales
+    leyenda : string, leyenda de la barra
+    tiempo_ini : datetime, tiempo inicial de la barra en formato datetime   
+    
+    Autores: Leslie Cusato, Marco Petriella
+    """    
+    
+    n_caracteres = 30    
+    barrita = int(n_caracteres*(paso+1)/pasos_totales)*'#'    
+    ahora = datetime.datetime.now()
+    eta = (ahora-tiempo_ini).total_seconds()
+    eta = (pasos_totales - paso - 1)/(paso+1)*eta
+    stdout.write("\r %s %s %3d %s [%s] %s %6.1f %s" % (leyenda,':',  int(100*(paso+1)/pasos_totales), ' %', barrita.ljust(n_caracteres),'ETA: ',eta,'seg'))
+    
+    
+    
+    
+
 def function_generator(parametros):
     
     """
@@ -243,7 +269,7 @@ def play_rec(parametros):
     frecs_send = np.zeros([steps_frec,steps_amplitud,output_channels])
     amplitudes_send = np.zeros([steps_frec,steps_amplitud,output_channels])
           
-    def producer(steps_frec,steps_amplitud,delta_frec):  
+    def producer(steps_frec,steps_amplitud):  
         for i in range(steps_frec):
             
             for k in range(steps_amplitud):
@@ -286,6 +312,7 @@ def play_rec(parametros):
     # Defino el thread que adquiere la señal   
     def consumer(steps_frec,steps_amplitud):
         cont = 0
+        tiempo_ini = datetime.datetime.now()
         for i in range(steps_frec):
             
             for k in range(steps_amplitud):
@@ -305,7 +332,7 @@ def play_rec(parametros):
                     data_acq[i,k,:,j] = data_i[j::input_channels]                   
                     
                 # Barra de progreso
-                stdout.write("\r[%s]" % ('Progreso barrido: ' + str(int(100*cont/steps_frec/steps_amplitud)) + ' %'))
+                barra_progreso(cont-1,steps_frec*steps_amplitud,'Progreso barrido',tiempo_ini)          
                                 
                 lock2.release() # Avisa al productor que terminó de escribir los datos y puede comenzar con el próximo step
     
@@ -316,7 +343,7 @@ def play_rec(parametros):
     consumer_exit = [False] 
             
     # Inicio los threads    
-    t1 = threading.Thread(target=producer, args=[steps_frec,steps_amplitud,delta_frec_hz])
+    t1 = threading.Thread(target=producer, args=[steps_frec,steps_amplitud])
     t2 = threading.Thread(target=consumer, args=[steps_frec,steps_amplitud])
     t1.start()
     t2.start()
@@ -370,6 +397,7 @@ def sincroniza_con_trigger(parametros):
     retardos = np.array([])
     
     cont = 0
+    tiempo_ini = datetime.datetime.now()
     for k in range(data_acq.shape[1]):
         
         trigger_send = data_send[:,k,:,0]
@@ -377,10 +405,10 @@ def sincroniza_con_trigger(parametros):
     
         for i in range(data_acq.shape[0]):
             cont = cont + 1
-            stdout.write("\r[%s]" % (u'Progreso corrección: ' + str(int(100*cont/data_acq.shape[1]/data_acq.shape[0])) + ' %'))
+            barra_progreso(cont-1,data_acq.shape[1]*data_acq.shape[0],u'Progreso corrección',tiempo_ini) 
 
             corr = np.correlate(trigger_send[i,:] - np.mean(trigger_send[i,:]),trigger_acq[i,:] - np.mean(trigger_acq[i,:]),mode='full')
-            pos_max = trigger_acq.shape[1] - np.argmax(corr) - 1
+            pos_max = trigger_acq.shape[1] - np.argmax(corr)-1
             retardos = np.append(retardos,pos_max)
             
             for j in range(data_acq.shape[3]):
@@ -393,14 +421,14 @@ def sincroniza_con_trigger(parametros):
     
 ## Realiza medición y grafica
 parametros = {}
-parametros['fs'] = 44100
-parametros['steps_frec'] = 10 
-parametros['steps_amplitud'] = 10 
+parametros['fs'] = 44100*8
+parametros['steps_frec'] = 10
+parametros['steps_amplitud'] = 20
 parametros['duration_sec_send'] = 0.01
 parametros['input_channels'] = 2
 parametros['output_channels'] = 2
 
-parametros['tipo_ch0'] = 'square' 
+parametros['tipo_ch0'] = 'sin' 
 parametros['amplitud_ini_ch0'] = 0.1 
 parametros['amplitud_fin_ch0'] = 0.1 
 parametros['frec_ini_hz_ch0'] = 500 
@@ -417,21 +445,22 @@ parametros['corrige_retardos'] = 'si'
 data_acq, data_send, frecs_send, amplitudes_send, retardos = play_rec(parametros)
 
 
+plt.plot(np.transpose(data_acq[:,0,:,1]))
 
 
 #%%
 
-## Corrige retardo y grafica
-parametros_retardo = {}
-parametros_retardo['data_send'] = data_send
-parametros_retardo['data_acq']  = data_acq
-
-data_acq, retardos = sincroniza_con_trigger(parametros_retardo)
+### Corrige retardo y grafica
+#parametros_retardo = {}
+#parametros_retardo['data_send'] = data_send
+#parametros_retardo['data_acq']  = data_acq
+#
+#data_acq, retardos = sincroniza_con_trigger(parametros_retardo)
 
 #%%
 ch = 1
 ind_frec = 2
-ind_amplitud = 9
+ind_amplitud = 0
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.12, .12, .75, .8])
@@ -475,8 +504,8 @@ frec_acq = frec_acq*(fs/2+1)/int(data_acq.shape[2]/2+1)
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.12, .12, .75, .8])
 ax1 = ax.twinx()
-ax.plot(frec_send,fft_send, label='Frec enviada: ' + str(frecs_send[ind_frec,ind_amplitud,ch_send]) + ' Hz - Amplutud enviada: ' + str(amplitudes_send[ind_frec,ind_amplitud,ch_send]))
-ax1.plot(frec_acq,fft_acq,color='red', label=u'Señal adquirida')
+ax.plot(frec_send,fft_send,'-' ,label='Frec enviada: ' + str(frecs_send[ind_frec,ind_amplitud,ch_send]) + ' Hz - Amplutud enviada: ' + str(amplitudes_send[ind_frec,ind_amplitud,ch_send]),alpha=0.7)
+ax1.plot(frec_acq,fft_acq,'-',color='red', label=u'Señal adquirida',alpha=0.7)
 ax.set_title(u'FFT de la señal enviada y adquirida')
 ax.set_xlabel('Frecuencia [Hz]')
 ax.set_ylabel('Amplitud [a.u.]')
@@ -503,3 +532,4 @@ Ir = Vs/Rs - Vd/Rs
 plt.plot(Vd,Id)
 plt.plot(Vd,Ir)
 
+    

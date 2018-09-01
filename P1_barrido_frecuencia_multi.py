@@ -349,14 +349,14 @@ def sincroniza_con_trigger(parametros):
     
     Parámetros:
     -----------
-    data_send : numpy array, de tamaño [steps_frec][muestras_por_pasos_output][output_channels]
-    data_acq : numpy array, array de tamaño [steps_frec][muestras_por_pasos_input][input_channels]
+    data_acq: numpy array, array de tamaño [steps_frec][steps_amplitud][muestras_por_pasos_input][input_channels]
+    data_send: numpy array, array de tamaño [steps_frec][steps_amplitud][muestras_por_pasos_output][output_channels]
     
     Salida (returns):
     -----------------
-    data_acq_corrected : numpy array, señal de salida con retardo corregido de tamaño [steps_frec][muestras_por_pasos_input][input_channels]. 
+    data_acq_corrected : numpy array, señal de salida con retardo corregido de tamaño [steps_frec][steps_amplitud][muestras_por_pasos_input][input_channels]. 
                          El tamaño de la segunda dimensión es la misma que la de data_send.
-    retardos : numpy array, array con los retardos de tamaño [steps_frec].
+    retardos : numpy array, array con los retardos de tamaño [steps_frec*steps_amplitud].
     
     Autores: Leslie Cusato, Marco Petriella   
     """

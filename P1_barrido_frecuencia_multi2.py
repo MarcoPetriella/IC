@@ -221,10 +221,8 @@ def play_rec(parametros):
         
     # Defino el thread que adquiere la señal   
     def consumer(steps):
-        cont = 0
         tiempo_ini = datetime.datetime.now()
         for i in range(steps):           
-            cont = cont + 1
             
             # Toma el lock, adquiere la señal y la guarda en el array
             lock1.acquire()
@@ -240,7 +238,7 @@ def play_rec(parametros):
                 data_acq[i,:,j] = data_i[j::input_channels]                   
                     
             # Barra de progreso
-            barra_progreso(cont-1,steps,'Progreso barrido',tiempo_ini)          
+            barra_progreso(i,steps,'Progreso barrido',tiempo_ini)          
                                 
             lock2.release() # Avisa al productor que terminó de escribir los datos y puede comenzar con el próximo step
     
@@ -308,13 +306,10 @@ def sincroniza_con_trigger(parametros):
     trigger_send = data_send[:,:,0]
     trigger_acq = data_acq[:,:,0]           
     
-    
-    cont = 0
     tiempo_ini = datetime.datetime.now()
              
     for i in range(data_acq.shape[0]):
-        cont = cont + 1
-        barra_progreso(cont-1,data_acq.shape[0],u'Progreso corrección',tiempo_ini) 
+        barra_progreso(i,data_acq.shape[0],u'Progreso corrección',tiempo_ini) 
 
         corr = np.correlate(trigger_send[i,:] - np.mean(trigger_send[i,:]),trigger_acq[i,:] - np.mean(trigger_acq[i,:]),mode='full')
         pos_max = trigger_acq.shape[1] - np.argmax(corr)-1

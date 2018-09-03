@@ -170,6 +170,9 @@ def play_rec(parametros):
     chunk_send = int(fs*duration_sec_send)
     chunk_acq = int(fs*duration_sec_acq)
     
+    # Donde se guardan los resultados                     
+    data_acq = np.zeros([data_send.shape[0],chunk_acq,input_channels],dtype=np.int16)      
+    
     # Defino el stream del parlante
     stream_output = p.open(format=pyaudio.paFloat32,
                     channels = output_channels,
@@ -215,10 +218,7 @@ def play_rec(parametros):
     
         producer_exit[0] = True  
             
-            
-    # Donde se guardan los resultados                     
-    data_acq = np.zeros([data_send.shape[0],chunk_acq,input_channels],dtype=np.int16)  
-        
+
     # Defino el thread que adquiere la señal   
     def consumer(steps):
         tiempo_ini = datetime.datetime.now()

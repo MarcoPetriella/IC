@@ -171,7 +171,7 @@ def play_rec(parametros):
     chunk_acq = int(fs*duration_sec_acq)
     
     # Donde se guardan los resultados                     
-    data_acq = np.zeros([data_send.shape[0],chunk_acq,input_channels],dtype=np.int16)      
+    data_acq = np.zeros([data_send.shape[0],chunk_acq,input_channels],dtype=np.int32)      
     
     # Defino el stream del parlante
     stream_output = p.open(format=pyaudio.paFloat32,
@@ -185,11 +185,11 @@ def play_rec(parametros):
     chunk_acq_eff = chunk_acq + chunk_delay
     
     # Defino el stream del microfono
-    stream_input = p.open(format = pyaudio.paInt16,
+    stream_input = p.open(format = pyaudio.paInt32,
                     channels = input_channels,
                     rate = fs,
                     input = True,
-                    frames_per_buffer = chunk_acq_eff*p.get_sample_size(pyaudio.paInt16),
+                    frames_per_buffer = chunk_acq_eff*p.get_sample_size(pyaudio.paInt32),
     )
     
     # Defino los semaforos para sincronizar la señal y la adquisicion
@@ -231,7 +231,7 @@ def play_rec(parametros):
             data_i = stream_input.read(chunk_acq)  
             stream_input.stop_stream()   
                 
-            data_i = -np.frombuffer(data_i, dtype=np.int16)                            
+            data_i = -np.frombuffer(data_i, dtype=np.int32)                            
                 
             # Guarda la salida                   
             for j in range(input_channels):
@@ -326,14 +326,15 @@ def sincroniza_con_trigger(parametros):
 
 
 # Genero matriz de señales: ejemplo de barrido en frecuencias en el canal 0
-fs = 44100   
+fs = 44100 *8  
 duracion = 0.2
 muestras = int(fs*duracion)
 canales = 2
-amplitud = 0.2
-frec_ini = 5000
-delta_frec = 35
-pasos = 20
+amplitud = 0.3
+frec_ini = 500
+frec_fin = 25000
+pasos = 40
+delta_frec = (frec_fin-frec_ini)/(pasos+1)
 data_send = np.zeros([pasos,muestras,canales])
 
 
@@ -346,6 +347,7 @@ for i in range(pasos):
     parametros_signal['tipo'] = 'sin'
     
     output_signal = function_generator(parametros_signal)
+    output_signal = output_signal*np.arange(muestras)/muestras
     data_send[i,:,0] = output_signal
 
 
@@ -373,13 +375,13 @@ plt.plot(np.transpose(data_acq[0,:,0]))
 
 #%%
 ch = 0
-step = 5
+step = 10
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.12, .12, .75, .8])
 ax1 = ax.twinx()
-ax.plot(np.transpose(data_acq[step,:,ch]),'-',color='r', label='señal adquirida')
-ax1.plot(np.transpose(data_send[step,:,ch]),'-',color='b', label='señal enviada')
+ax.plot(np.transpose(data_acq[step,:,ch]),'-',color='r', label='señal adquirida',alpha=0.5)
+ax1.plot(np.transpose(data_send[step,:,ch]),'-',color='b', label='señal enviada',alpha=0.5)
 ax.legend(loc=1)
 ax1.legend(loc=4)
 plt.show()

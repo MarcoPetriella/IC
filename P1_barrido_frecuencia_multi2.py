@@ -125,7 +125,7 @@ def play_rec(parametros):
     parametros = {}
     parametros['fs'] : int, frecuencia de sampleo de la placa de audio. Valor máximo 44100*8 Hz. [Hz]
     parametros['input_channels'] : int, cantidad de canales de entrada.
-    parametros['data_send'] : numpy array dtype=np.float32, array de trs dimensiones que la señal a enviar [cantidad_de_pasos][muestras_por_pasos][output_channels]
+    parametros['data_send'] : numpy array dtype=np.float32, array de tres dimensiones de la señal a enviar [cantidad_de_pasos][muestras_por_paso][output_channels]
     parametros['corrige_retardos'] = {'si','no'}, corrige el retardo utilizando la función sincroniza_con_trigger
     
     Salida (returns):
@@ -332,7 +332,7 @@ def sincroniza_con_trigger(parametros):
     
 
 
-# Genero matriz de señales
+# Genero matriz de señales: ejemplo de barrido en frecuencias en el canal 0
 fs = 44100   
 duracion = 0.2
 muestras = int(fs*duracion)
@@ -344,7 +344,7 @@ pasos = 20
 data_send = np.zeros([pasos,muestras,canales])
 
 
-for i in range(data_send.shape[0]):
+for i in range(pasos):
     parametros_signal = {}
     parametros_signal['fs'] = fs
     parametros_signal['amplitud'] = amplitud

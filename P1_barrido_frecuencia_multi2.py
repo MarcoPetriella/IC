@@ -146,9 +146,7 @@ def play_rec(parametros):
     parametros['corrige_retardos'] = 'si'
     
     data_acq, retardos = play_rec(parametros)
-
-    
-    
+   
     Autores: Leslie Cusato, Marco Petriella    
     """    
     
@@ -338,7 +336,7 @@ duracion = 0.2
 muestras = int(fs*duracion)
 canales = 2
 amplitud = 0.2
-frec_ini = 500
+frec_ini = 5000
 delta_frec = 35
 pasos = 20
 data_send = np.zeros([pasos,muestras,canales])
@@ -350,7 +348,7 @@ for i in range(pasos):
     parametros_signal['amplitud'] = amplitud
     parametros_signal['frec'] = frec_ini + i*delta_frec
     parametros_signal['duracion'] = duracion
-    parametros_signal['tipo'] = 'ramp'
+    parametros_signal['tipo'] = 'sin'
     
     output_signal = function_generator(parametros_signal)
     data_send[i,:,0] = output_signal
@@ -394,9 +392,9 @@ plt.show()
 
 fig = plt.figure(figsize=(14, 7), dpi=250)
 ax = fig.add_axes([.1, .1, .75, .8])
-ax.hist(retardos, bins=100)
+ax.hist(retardos/fs*1000, bins=100)
 ax.set_title(u'Retardos')
-ax.set_xlabel('Retardos')
+ax.set_xlabel('Retardos [ms]')
 ax.set_ylabel('Frecuencia')
 
 

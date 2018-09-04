@@ -50,11 +50,12 @@ def barra_progreso(paso,pasos_totales,leyenda,tiempo_ini):
     ahora = datetime.datetime.now()
     eta = (ahora-tiempo_ini).total_seconds()
     eta = (pasos_totales - paso - 1)/(paso+1)*eta
+    
+    if paso == 0:
+        print("\n")        
        
     stdout.write("\r %s %s %3d %s |%s| %s %6.1f %s" % (leyenda,':',  int(100*(paso+1)/pasos_totales), '%', barrita.ljust(n_caracteres),'ETA:',eta,'seg'))
     
-    if paso == pasos_totales-1:
-        print("\n")    
     
     
     
